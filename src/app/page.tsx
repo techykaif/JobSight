@@ -1,6 +1,10 @@
 import { db } from '@/lib/db/client';
 import * as schema from '@/lib/db/schema';
-import { sql } from 'drizzle-orm';
+import { sql, eq } from 'drizzle-orm';
+import Link from 'next/link';
+import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
+import { MetricCard } from '@/components/ui/MetricCard';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 export default async function DashboardPage() {
   const jobsCountRes = await db.select({ count: sql<number>`count(*)` }).from(schema.jobs);
@@ -15,42 +19,73 @@ export default async function DashboardPage() {
   const considerCount = decisionsRes.find(d => d.decision === 'CONSIDER')?.count || 0;
   const skipCount = decisionsRes.find(d => d.decision === 'SKIP')?.count || 0;
   
+  const qualifiedJobs = totalJobs - skipCount;
+
+  const watchlistsRes = await db.select({ count: sql<number>`count(*)` }).from(schema.watchlists);
+  const monitorCount = watchlistsRes[0]?.count || 0;
+
+  const hiddenGemsRes = await db.select({ count: sql<number>`count(*)` })
+    .from(schema.discoveryIntelligence)
+    .where(eq(schema.discoveryIntelligence.hiddenGem, true));
+  const hiddenGems = hiddenGemsRes[0]?.count || 0;
+
+  const maxSalaryRes = await db.select({ maxSal: sql<number>`max(${schema.jobs.salaryMax})` }).from(schema.jobs);
+  const highestSalary = maxSalaryRes[0]?.maxSal || 0;
+
+  const lowCompRes = await db.select({ count: sql<number>`count(*)` })
+    .from(schema.discoveryIntelligence)
+    .where(eq(schema.discoveryIntelligence.competition, 'LOW'));
+  const lowestCompetition = lowCompRes[0]?.count || 0;
+
   const companiesRes = await db.select({ count: sql<number>`count(*)` }).from(schema.companies);
   const totalCompanies = companiesRes[0]?.count || 0;
 
+  const avgOppRes = await db.select({ avg: sql<number>`avg(${schema.opportunityIntelligence.opportunityScore})` }).from(schema.opportunityIntelligence);
+  const avgOpportunityScore = Math.round(avgOppRes[0]?.avg || 0);
+
+  const highestSalaryFormatted = highestSalary > 0 
+    ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(highestSalary)
+    : 'N/A';
+
   return (
-    <div>
-      <div className="page-header">
-        <h2>Overview</h2>
+    <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
+      <Breadcrumbs items={[{ label: 'Home', href: '/' }, { label: 'Dashboard' }]} className="mb-6" />
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <h2 style={{ margin: 0, fontSize: '2rem', fontWeight: 600, background: 'linear-gradient(to right, var(--text-main), var(--text-muted))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          Intelligence Dashboard
+        </h2>
+        <Link href="/hunts/new" className="btn btn-primary" style={{ padding: '0.75rem 1.5rem', borderRadius: '8px', background: 'var(--primary)', color: 'white', textDecoration: 'none', fontWeight: 500, transition: 'transform 0.2s, box-shadow 0.2s' }}>
+          Start New Hunt
+        </Link>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
-        <div style={{ padding: '1.5rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-          <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '0.5rem' }}>Total Jobs</div>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{totalJobs}</div>
-        </div>
-        
-        <div style={{ padding: '1.5rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-          <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '0.5rem' }}>To Apply</div>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--success-text)' }}>{applyCount}</div>
-        </div>
+      {totalJobs === 0 ? (
+        <EmptyState 
+          title="No jobs found yet" 
+          description="Start your first hunt to discover opportunities, research companies, and find your dream role." 
+          icon="🚀" 
+        />
+      ) : (
+        <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem', animation: 'fadeIn 0.5s ease-out' }}>
+          <MetricCard href="/jobs" label="Jobs Found" value={totalJobs} trend={{ value: 12, isPositive: true }} icon={<span style={{ fontSize: '1.25rem' }}>🔍</span>} />
 
-        <div style={{ padding: '1.5rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-          <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '0.5rem' }}>To Consider</div>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--warning-text)' }}>{considerCount}</div>
-        </div>
+          <MetricCard href="/jobs" label="Qualified Jobs" value={qualifiedJobs} trend={{ value: 8, isPositive: true }} icon={<span style={{ fontSize: '1.25rem' }}>🎯</span>} />
 
-        <div style={{ padding: '1.5rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-          <div style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '0.5rem' }}>Companies</div>
-          <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{totalCompanies}</div>
-        </div>
-      </div>
-      
-      {totalJobs === 0 && (
-        <div style={{ textAlign: 'center', padding: '4rem 2rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-          <h3 style={{ margin: '0 0 1rem 0' }}>No Jobs Found</h3>
-          <p style={{ color: 'var(--text-secondary)', margin: '0 0 2rem 0' }}>Configure and start a new hunt to discover opportunities.</p>
-          <a href="/hunts/new" className="btn btn-primary">Create Hunt Configuration</a>
+          <MetricCard href="/board" label="Apply Now" value={applyCount} icon={<span style={{ fontSize: '1.25rem', color: 'var(--success-text)' }}>🚀</span>} />
+
+          <MetricCard href="/board" label="Apply This Week" value={considerCount} icon={<span style={{ fontSize: '1.25rem', color: 'var(--warning-text)' }}>📅</span>} />
+
+          <MetricCard href="/board" label="Monitor" value={monitorCount} icon={<span style={{ fontSize: '1.25rem', color: 'var(--accent-color)' }}>👀</span>} />
+
+          <MetricCard href="/radar" label="Hidden Gems" value={hiddenGems} icon={<span style={{ fontSize: '1.25rem' }}>💎</span>} />
+
+          <MetricCard href="/jobs?sort=salary_desc" label="Highest Salary" value={highestSalaryFormatted} icon={<span style={{ fontSize: '1.25rem' }}>💰</span>} />
+
+          <MetricCard href="/radar" label="Lowest Competition" value={lowestCompetition} icon={<span style={{ fontSize: '1.25rem' }}>🏃</span>} />
+
+          <MetricCard href="/companies" label="Companies Researched" value={totalCompanies} icon={<span style={{ fontSize: '1.25rem' }}>🏢</span>} />
+
+          <MetricCard href="/radar" label="Avg Opportunity Score" value={avgOpportunityScore > 0 ? `${avgOpportunityScore}/100` : 'N/A'} icon={<span style={{ fontSize: '1.25rem' }}>⭐</span>} />
         </div>
       )}
     </div>

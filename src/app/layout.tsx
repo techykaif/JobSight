@@ -1,5 +1,6 @@
 import './globals.css';
 import Link from 'next/link';
+import GlobalSearch from '@/components/GlobalSearch';
 
 export const metadata = {
   title: 'JOBSight',
@@ -14,13 +15,16 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <GlobalSearch />
         <div className="app-shell">
           <aside className="sidebar">
             <h1>JOBSight</h1>
             <nav>
               <Link href="/" className="nav-link">Overview</Link>
+              <Link href="/radar" className="nav-link">Discovery Radar</Link>
+              <Link href="/board" className="nav-link">Decision Board</Link>
               <Link href="/hunts" className="nav-link">Hunts</Link>
-              <Link href="/jobs" className="nav-link">Jobs</Link>
+              <Link href="/jobs" className="nav-link">Jobs Explorer</Link>
               <Link href="/companies" className="nav-link">Companies</Link>
               <Link href="/profile" className="nav-link">Profile</Link>
               <Link href="/settings" className="nav-link">Settings</Link>
