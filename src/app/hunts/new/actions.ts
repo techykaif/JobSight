@@ -39,6 +39,13 @@ export async function saveHuntConfig(formData: FormData) {
     searchScope,
     candidateCountry,
     maximumUsableResults,
+    
+    discoveryStrategy: formData.get('discoveryStrategy')?.toString() || 'strategy_stealth',
+    discoveryGroups: formData.get('discoveryGroups')?.toString().split(',').map(s => s.trim()).filter(Boolean) || [],
+    userUrls: formData.get('userUrls')?.toString().split('\n').map(s => s.trim()).filter(Boolean) || [],
+    maximumProviders: formData.get('maximumProviders') ? parseInt(formData.get('maximumProviders')!.toString(), 10) : 10,
+    maximumRuntime: formData.get('maximumRuntime') ? parseInt(formData.get('maximumRuntime')!.toString(), 10) : 120000,
+    
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };

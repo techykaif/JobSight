@@ -3,6 +3,9 @@ import { providerRegistry } from '../lib/discovery/registry.js';
 import { runDiscovery } from '../lib/discovery/orchestrator.js';
 import { SearchEngineProvider, GreenhouseProvider, LeverProvider, CareersPageProvider } from '../lib/discovery/providers/index.js';
 import * as repos from '../lib/db/repositories/index.js';
+import { bootstrap } from '../lib/bootstrap.js';
+
+bootstrap();
 
 // Mock DB
 vi.mock('../lib/db/repositories/index.js', async (importOriginal) => {
@@ -64,9 +67,9 @@ describe('Discovery Intelligence Platform', () => {
     // Verify Telemetry
     const saveEventCalls = vi.mocked(repos.saveEvent).mock.calls;
     
-    // 1 STRATEGY_STARTED + 1 STRATEGY_COMPLETED = 2 events (early termination not hit here)
-    expect(saveEventCalls.length).toBe(2);
-    
+    // Now it emits STRATEGY_STARTED, PROVIDER_STARTED/COMPLETED for each source, STRATEGY_COMPLETED.
+    expect(saveEventCalls.length).toBeGreaterThanOrEqual(2);
+
     const startedEvent = saveEventCalls.find(c => c[0].eventType === 'STRATEGY_STARTED');
     expect(startedEvent).toBeDefined();
 

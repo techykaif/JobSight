@@ -6,6 +6,9 @@ export default function LiveEventFeed({ runId }: { runId: string }) {
   const [events, setEvents] = useState<any[]>([]);
   const [connected, setConnected] = useState(false);
 
+  const [metrics, setMetrics] = useState<any>(null);
+  const [statusInfo, setStatusInfo] = useState<any>(null);
+
   useEffect(() => {
     const es = new EventSource(`/api/runs/${runId}/events`);
     
@@ -18,6 +21,14 @@ export default function LiveEventFeed({ runId }: { runId: string }) {
         setConnected(false);
         return;
       }
+      if (data.type === 'METRICS') {
+        setMetrics(data.metrics);
+        return;
+      }
+      if (data.type === 'STATUS') {
+        setStatusInfo({ status: data.status, stage: data.stage });
+        return;
+      }
       setEvents(prev => {
         if (prev.find(x => x.id === data.id)) return prev;
         return [...prev, data];
@@ -27,19 +38,43 @@ export default function LiveEventFeed({ runId }: { runId: string }) {
     es.onerror = () => {
       setConnected(false);
       es.close();
-      // Simple reconnect logic
       setTimeout(() => {
-        // In a real app we'd dispatch an action to reconnect cleanly
+        // Reconnect logic
       }, 5000);
     };
 
-    return () => {
-      es.close();
-    };
+    return () => es.close();
   }, [runId]);
 
   return (
     <div style={{ marginTop: '2rem' }}>
+      {statusInfo && (
+        <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+          <h3 style={{ marginTop: 0 }}>Live Status</h3>
+          <div style={{ display: 'flex', gap: '2rem' }}>
+            <div><strong>Status:</strong> {statusInfo.status}</div>
+            <div><strong>Stage:</strong> {statusInfo.stage}</div>
+          </div>
+        </div>
+      )}
+
+      {metrics && (
+        <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+          <h3 style={{ marginTop: 0 }}>Discovery Metrics</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
+            <div><strong>Providers Used:</strong> {metrics.providersUsed}</div>
+            <div><strong>Sources Attempted:</strong> {metrics.sourcesAttempted}</div>
+            <div><strong>Sources Completed:</strong> {metrics.sourcesCompleted}</div>
+            <div><strong>Jobs Found:</strong> {metrics.jobsFound}</div>
+            <div><strong>Qualified:</strong> {metrics.qualified}</div>
+            <div><strong>Accepted:</strong> {metrics.accepted}</div>
+            <div><strong>Rejected:</strong> {metrics.rejected}</div>
+            <div><strong>Research Complete:</strong> {metrics.researchComplete}</div>
+            <div><strong>Elapsed:</strong> {Math.floor(metrics.elapsedTime / 1000)}s</div>
+          </div>
+        </div>
+      )}
+
       <h3>Live Event Feed {connected && <span style={{ fontSize: '0.8rem', color: 'var(--success-text)' }}>● Live</span>}</h3>
       <div style={{ 
         backgroundColor: '#000', 
@@ -58,6 +93,8 @@ export default function LiveEventFeed({ runId }: { runId: string }) {
             <span style={{ marginLeft: '1rem' }}>
               {ev.payload?.message || ev.eventType} 
               {ev.entityId && <span style={{ color: '#08f' }}> [{ev.entityId.slice(0, 8)}]</span>}
+              {ev.payload?.provider && <span style={{ color: '#f80' }}> [Provider: {ev.payload.provider}]</span>}
+              {ev.payload?.url && <span style={{ color: '#a8f' }}> [URL: {ev.payload.url}]</span>}
             </span>
           </div>
         ))}

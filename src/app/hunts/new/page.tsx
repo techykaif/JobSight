@@ -78,7 +78,38 @@ export default function NewHuntPage() {
             <input type="number" name="maximumUsableResults" className="form-input" defaultValue="5" />
           </div>
 
-          <button type="submit" className="btn btn-primary" style={{ marginTop: '1rem' }}>Create Hunt (Will execute in M8)</button>
+          <div className="form-group" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', marginTop: '1rem' }}>
+            <h3 style={{ marginTop: 0, marginBottom: '1rem' }}>Discovery Configuration</h3>
+            
+            <label className="form-label">Discovery Strategy</label>
+            <select name="discoveryStrategy" className="form-input" defaultValue="strategy_stealth" style={{ marginBottom: '1rem' }}>
+              <option value="strategy_stealth">Stealth Discovery (Highest Quality)</option>
+              <option value="strategy_high_comp">High Compensation Priority</option>
+              <option value="strategy_startup">Startup Priority</option>
+              <option value="strategy_enterprise">Enterprise Priority</option>
+              <option value="strategy_remote_first">Remote First</option>
+              <option value="strategy_default">Default</option>
+            </select>
+
+            <label className="form-label">Discovery Groups (comma-separated IDs)</label>
+            <input type="text" name="discoveryGroups" className="form-input" placeholder="e.g., group_yc, group_remote" style={{ marginBottom: '1rem' }} />
+
+            <label className="form-label">Custom Source URLs (one per line)</label>
+            <textarea name="userUrls" className="form-input" rows={3} placeholder="https://careers.google.com&#10;https://boards.greenhouse.io/openai" style={{ marginBottom: '1rem' }}></textarea>
+            
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <div style={{ flex: 1 }}>
+                <label className="form-label">Maximum Providers</label>
+                <input type="number" name="maximumProviders" className="form-input" defaultValue="10" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label className="form-label">Max Runtime (ms)</label>
+                <input type="number" name="maximumRuntime" className="form-input" defaultValue="120000" />
+              </div>
+            </div>
+          </div>
+
+          <button type="submit" className="btn btn-primary" style={{ marginTop: '1rem' }}>Create Hunt</button>
         </form>
       </div>
     </div>

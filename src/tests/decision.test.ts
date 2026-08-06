@@ -9,6 +9,9 @@ import {
 } from '../lib/decision/strategies.js';
 import { runDecisionEngine, generateDecisionQueue, generateWeeklyStrategy } from '../lib/decision/engine.js';
 import * as repos from '../lib/db/repositories/index.js';
+import { bootstrap } from '../lib/bootstrap.js';
+
+bootstrap();
 
 // Mock DB
 vi.mock('../lib/db/repositories/index.js', async (importOriginal) => {

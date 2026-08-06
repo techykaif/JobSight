@@ -4,9 +4,7 @@ import { analyzerRegistry } from './registry.js';
 import { registerCoreAnalyzers } from './analyzers/index.js';
 import type { AnalyzerContext, DiscoveryIntelligenceOutput } from './interfaces.js';
 
-// Ensure analyzers are registered
-registerCoreAnalyzers();
-
+// Removed auto-registration to support centralized bootstrap
 export async function runDiscoveryIntelligence(context: AnalyzerContext): Promise<DiscoveryIntelligenceOutput> {
   const analyzers = analyzerRegistry.getAll();
   

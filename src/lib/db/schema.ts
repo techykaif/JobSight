@@ -26,6 +26,13 @@ export const huntConfigs = sqliteTable('hunt_configs', {
   experiencePreferences: text('experience_preferences', { mode: 'json' }), // object
   requiredSkills: text('required_skills', { mode: 'json' }), // string[]
   excludedCompanies: text('excluded_companies', { mode: 'json' }), // string[]
+  
+  // V1.0.1-A5.1 Discovery config
+  discoveryStrategy: text('discovery_strategy'),
+  discoveryGroups: text('discovery_groups', { mode: 'json' }), // string[]
+  userUrls: text('user_urls', { mode: 'json' }), // string[]
+  maximumProviders: integer('maximum_providers'),
+  maximumRuntime: integer('maximum_runtime'),
   ...timestampFields
 });
 

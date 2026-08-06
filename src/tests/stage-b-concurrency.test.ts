@@ -22,6 +22,9 @@ vi.mock('../lib/agy/runner.js', () => ({
 
 import { runAgyTask, runAgyUnstructured } from '../lib/agy/runner.js';
 import * as repos from '../lib/db/repositories/index.js';
+import { bootstrap } from '../lib/bootstrap.js';
+
+bootstrap();
 import { runIngestionPipeline } from '../lib/pipeline/ingestion.js';
 
 describe('Stage B Concurrency Stress Test', () => {
@@ -45,7 +48,8 @@ describe('Stage B Concurrency Stress Test', () => {
       targetRoles: ['SWE'],
       alternativeRoles: [],
       candidateCountry: 'India',
-      searchScope: 'LOCAL_AND_GLOBAL'
+      searchScope: 'LOCAL_AND_GLOBAL',
+      discoverySources: [{ url: 'SEARCH_ENGINE', type: 'SEARCH_ENGINE' }]
     });
 
     // Verify STAGE_B_TELEMETRY event

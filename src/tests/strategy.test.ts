@@ -3,6 +3,9 @@ import { strategyRegistry } from '../lib/discovery/strategy/registry.js';
 import { StealthStrategy, HighCompensationStrategy, DefaultStrategy } from '../lib/discovery/strategy/strategies.js';
 import { runDiscovery } from '../lib/discovery/orchestrator.js';
 import * as repos from '../lib/db/repositories/index.js';
+import { bootstrap } from '../lib/bootstrap.js';
+
+bootstrap();
 
 // Mock DB
 vi.mock('../lib/db/repositories/index.js', async (importOriginal) => {

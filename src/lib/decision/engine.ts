@@ -19,9 +19,7 @@ export function registerCoreStrategies() {
   decisionRegistry.register(new FallbackStrategy());
 }
 
-// Ensure registration
-registerCoreStrategies();
-
+// Removed auto-registration to support centralized bootstrap
 export async function runDecisionEngine(context: DecisionContext): Promise<DecisionResult> {
   await repos.saveEvent({
     id: crypto.randomUUID(),

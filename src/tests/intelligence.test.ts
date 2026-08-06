@@ -10,6 +10,9 @@ import { calculateOpportunityIntelligence } from '../lib/intelligence/opportunit
 import { generateOpportunityRadar } from '../lib/intelligence/radar.js';
 import { detectHiringTrend } from '../lib/intelligence/trends.js';
 import * as repos from '../lib/db/repositories/index.js';
+import { bootstrap } from '../lib/bootstrap.js';
+
+bootstrap();
 
 // Mock DB
 vi.mock('../lib/db/repositories/index.js', async (importOriginal) => {

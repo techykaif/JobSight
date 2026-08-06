@@ -5,10 +5,9 @@ import type { DiscoveryContext, DiscoveryResult, DiscoveredJob } from './interfa
 import { registerCoreProviders } from './providers/index.js';
 
 import { registerCoreStrategies, strategyRegistry } from './strategy/index.js';
+import { resolveDiscoverySources, updateSourceHealth } from './source-manager.js';
 
-// Ensure providers and strategies are registered
-registerCoreProviders();
-registerCoreStrategies();
+// Removed auto-registration to support centralized bootstrap
 
 export async function runDiscovery(runId: string, config: any, abortSignal?: AbortSignal): Promise<{ jobs: DiscoveredJob[], unstructuredText: string }> {
   console.log(`[Discovery] Starting discovery for run ${runId}`);
@@ -29,13 +28,8 @@ export async function runDiscovery(runId: string, config: any, abortSignal?: Abo
     payload: { strategy: strategy.name, budget: strategyConfig.maxBudgetMs }
   });
 
-  // 2. Resolve Sources
-  let baseSources = config.discoverySources || [
-    { url: 'SEARCH_ENGINE', type: 'SEARCH_ENGINE' },
-    { url: 'https://boards.greenhouse.io/test', type: 'GREENHOUSE' },
-    { url: 'https://jobs.lever.co/test', type: 'LEVER' },
-    { url: 'https://example.com/careers', type: 'CAREERS_PAGE' }
-  ];
+  // 2. Resolve Sources (Groups, User URLs, Default fallback)
+  const baseSources = await resolveDiscoverySources(config);
 
   // 3. Prioritize Sources via Strategy
   const prioritizedSources = strategy.prioritizeSources(baseSources);
@@ -56,6 +50,12 @@ export async function runDiscovery(runId: string, config: any, abortSignal?: Abo
   let earlyTerminated = false;
   let terminationReason = '';
 
+  // Telemetry metrics
+  let sourcesAttempted = 0;
+  let sourcesSuccessful = 0;
+  let sourcesFailed = 0;
+  let totalLatencyMs = 0;
+
   // 4. Execute Discovery Loop
   for (const source of prioritizedSources) {
     if (abortSignal?.aborted) {
@@ -64,7 +64,6 @@ export async function runDiscovery(runId: string, config: any, abortSignal?: Abo
       break;
     }
 
-    // Check budget / usable goals BEFORE next source
     const elapsedMs = Date.now() - discoveryStartTime;
     const termCheck = strategy.shouldTerminateEarly({
       elapsedMs,
@@ -82,21 +81,76 @@ export async function runDiscovery(runId: string, config: any, abortSignal?: Abo
     const provider = providerRegistry.findProviderForUrl(source.url);
     if (!provider) continue;
 
+    sourcesAttempted++;
     console.log(`[Discovery] Crawling ${source.url} using ${provider.name} (Weight: ${source.weight})`);
     
-    // Start measuring this source
+    // Live feed granularity
+    await repos.saveEvent({
+      id: crypto.randomUUID(),
+      runId,
+      timestamp: new Date().toISOString(),
+      eventType: 'PROVIDER_STARTED',
+      stage: 'DISCOVERY',
+      payload: { provider: provider.name, url: source.url }
+    });
+
+    const sourceStartTime = Date.now();
     context.sourceUrl = source.url;
+
+    const heartbeatInterval = setInterval(async () => {
+      await repos.saveEvent({
+        id: crypto.randomUUID(),
+        runId,
+        timestamp: new Date().toISOString(),
+        eventType: 'HEARTBEAT',
+        stage: 'DISCOVERY',
+        payload: { message: `Waiting for ${provider.name} response...`, provider: provider.name, url: source.url }
+      });
+    }, 5000);
+
     try {
       const result = await provider.discover(context);
+      clearInterval(heartbeatInterval);
+
+      const sourceLatency = Date.now() - sourceStartTime;
+      totalLatencyMs += sourceLatency;
+      sourcesSuccessful++;
       
+      let jobsFromSource = 0;
       if (result.jobs?.length) {
         allJobs.push(...result.jobs.map(j => provider.normalize(j)));
+        jobsFromSource = result.jobs.length;
       }
       if (result.unstructuredText) {
         allUnstructured += `\n\n--- Source: ${source.url} ---\n\n` + result.unstructuredText;
       }
+
+      await repos.saveEvent({
+        id: crypto.randomUUID(),
+        runId,
+        timestamp: new Date().toISOString(),
+        eventType: 'PROVIDER_COMPLETED',
+        stage: 'DISCOVERY',
+        payload: { provider: provider.name, jobsFound: jobsFromSource, latencyMs: sourceLatency }
+      });
+      
+      await updateSourceHealth(source.url, true, sourceLatency, jobsFromSource);
+      
     } catch (e: any) {
+      clearInterval(heartbeatInterval);
+      sourcesFailed++;
       console.error(`[Discovery] Error crawling ${source.url}:`, e);
+      
+      await repos.saveEvent({
+        id: crypto.randomUUID(),
+        runId,
+        timestamp: new Date().toISOString(),
+        eventType: 'PROVIDER_FAILED',
+        stage: 'DISCOVERY',
+        payload: { provider: provider.name, error: e.message }
+      });
+
+      await updateSourceHealth(source.url, false, Date.now() - sourceStartTime, 0);
     }
   }
 
@@ -131,6 +185,10 @@ export async function runDiscovery(runId: string, config: any, abortSignal?: Abo
     payload: { 
       strategy: strategy.name,
       runtime: finalElapsedMs,
+      sourcesAttempted,
+      sourcesSuccessful,
+      sourcesFailed,
+      avgLatencyMs: sourcesAttempted > 0 ? Math.round(totalLatencyMs / sourcesAttempted) : 0,
       jobsDiscovered: allJobs.length,
       jobsAccepted: finalJobs.length,
       jobsRejected: allJobs.length - finalJobs.length
