@@ -185,4 +185,4 @@ settings.local.*
 # AGY probe outputs
 m2-probe-results.json
 
-update_schema.ts
+update_schema.ts*.patch
