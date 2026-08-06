@@ -1,0 +1,1 @@
+ALTER TABLE `runs` ADD `profile_snapshot` text;
