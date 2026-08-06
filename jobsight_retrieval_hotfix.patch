@@ -1,0 +1,665 @@
+diff --git a/docs/V1_0_1_A5_2_PROVIDER_HOTFIX.md b/docs/V1_0_1_A5_2_PROVIDER_HOTFIX.md
+new file mode 100644
+index 0000000..3e74b7c
+--- /dev/null
++++ b/docs/V1_0_1_A5_2_PROVIDER_HOTFIX.md
+@@ -0,0 +1,201 @@
++# V1.0.1-A5.2 - RETRIEVAL Provider Hotfix
++
++## Observed runtime
++
++```
++Stage: RETRIEVAL
++Error: Cannot read properties of undefined (reading 'name')
++Providers Used: 0
++Sources Attempted: 0
++Sources Completed: 0
++Jobs Found: 0
++```
++
++## Exact root cause
++
++**File:** `src/lib/discovery/orchestrator.ts`
++**Line:** 19 (original code)
++
++```ts
++const strategyName = config.discoveryStrategy || 'strategy_default';
++const strategy = strategyRegistry.get(strategyName) || strategyRegistry.get('strategy_default')!;
++
++console.log(`[Discovery] Using strategy: ${strategy.name}`); // <- line 19, threw here
++```
++
++`strategyRegistry` and `providerRegistry` are populated exclusively by `bootstrap()`
++(`src/lib/bootstrap.ts`). Auditing every call site of `bootstrap()` in the codebase
++showed it was invoked **only from test files** (`discovery.test.ts`, `strategy.test.ts`,
++`decision.test.ts`, `intelligence.test.ts`, `stage-b-concurrency.test.ts`) - never from
++`missionManager.ts`, `pipeline/orchestrator.ts`, any Next.js route/action, or any
++instrumentation hook (none exists in this repo).
++
++A comment at the top of `discovery/orchestrator.ts` confirms this was a deliberate
++but incomplete refactor: `// Removed auto-registration to support centralized
++bootstrap`. The centralized `bootstrap()` was added, but nothing was ever wired up
++to call it in the real run path.
++
++**Why `strategy` was `undefined`:** on a real run, both registries are empty.
++`strategyRegistry.get(strategyName)` returns `undefined`, and the fallback
++`strategyRegistry.get('strategy_default')` *also* returns `undefined` because
++nothing has registered anything yet. The trailing `!` is a TypeScript-only
++non-null assertion - it is erased at compile time and provides no runtime
++protection. `strategy` is genuinely `undefined`, so `strategy.name` on the next
++line throws `Cannot read properties of undefined (reading 'name')`.
++
++This happens before `resolveDiscoverySources()` or any `Provider.discover()` call,
++which is exactly why every metric in the report reads zero. `npm test` was green
++throughout because every existing discovery/strategy test file calls `bootstrap()`
++itself at module load - none of them exercise the real, unbootstrapped call graph.
++
++### Confirmed reproduction
++
++A direct call to `runIngestionPipeline()` (the real Stage-A/RETRIEVAL entry point),
++without calling `bootstrap()` - matching production exactly - reproduced the crash
++verbatim:
++
++```
++[RETRIEVAL] Failed: Cannot read properties of undefined (reading 'name')
++```
++
++## Fix implemented
++
++No architecture change, no subsystem rewrite. Three targeted edits:
++
++**1. Root cause - `src/lib/pipeline/missionManager.ts`**
++`bootstrap()` is now called at the top of `MissionManager.start()`, the single
++real entry point used by both the UI (via `RunControls` -> the run-control route)
++and the `v1-0-1-acceptance.ts` script, which itself documents that it "exercises
++the EXACT same code path as the UI." `bootstrap()` no-ops after its first call, so
++calling it on every `start()` is cheap and safe.
++
++**2. Structured registry-miss error - `src/lib/discovery/orchestrator.ts`**
++Replaced the unsafe `!` assertion with an explicit runtime check. If a strategy
++still cannot be resolved (e.g. a future regression re-breaks the bootstrap wiring,
++or a caller requests a genuinely nonexistent strategy id with no default
++registered), discovery now throws a clear, structured error naming the requested
++id and how many strategies are currently registered, and emits a
++`STRATEGY_RESOLUTION_FAILED` telemetry event - instead of a bare, undiagnosable
++`TypeError`. This does not hide the failure; it still throws and still fails the
++run, it just fails loudly and legibly.
++
++**3. Hardening required by the task (`source-manager.ts`, `orchestrator.ts`)**
++- Unknown providers (source URL matches no registered provider) were already
++  skipped safely; kept as-is and locked in with a regression test.
++- Invalid custom URLs: `identifyAndPersistUserSource()` called `new URL(url).hostname`
++  unguarded. A URL that matches a provider by substring (e.g. `GreenhouseProvider`
++  only checks `.includes('boards.greenhouse.io')`) but has no scheme
++  (`boards.greenhouse.io/careers`) passes the provider check but throws on
++  `new URL()`. Now wrapped in try/catch and rejected gracefully (`return null`).
++- Empty discovery groups already resolved to zero members without crashing
++  (`getGroupMembers` returns `[]` for a nonexistent group); a group *lookup that
++  throws* was not previously guarded - now wrapped so it degrades to "no members"
++  instead of aborting the whole hunt.
++- Registry misses (missing provider mapping) in `resolveDiscoverySources` now
++  produce a filtered/skipped result instead of relying on unguarded lookups;
++  malformed `discoverySources` entries (missing/empty `url`) are validated and
++  skipped rather than silently reaching a provider's `.supports()` call with
++  a bad value.
++- One bad provider never stopping the rest was already correctly isolated
++  per-source inside `runDiscovery`'s loop; additionally hardened the provider
++  *resolution* step itself (`providerRegistry.findProviderForUrl`) with a
++  try/catch so a misbehaving `supports()` implementation can't abort discovery
++  of the remaining sources either.
++
++**4. Telemetry added (per task requirement 7)**
++- `STRATEGY_STARTED` now includes `strategyId`, `requestedStrategyId`, and
++  `usedFallbackStrategy` (selected strategy + whether it was a fallback).
++- New `SOURCE_RESOLUTION_COMPLETED` event: which providers resolved, how many
++  sources resolved vs. were left unresolved, and the unresolved URLs.
++- New `STRATEGY_RESOLUTION_FAILED` event on a registry-miss failure.
++- New `PROVIDER_RESOLUTION_FAILED` event if provider resolution itself throws
++  for a given source.
++
++## Tests added
++
++`src/tests/discovery-retrieval-hotfix.test.ts` (10 tests, all passing). Does not
++call `bootstrap()` at module scope (unlike the existing discovery/strategy test
++files) so each test controls its own registry state, including empty - the exact
++condition that caused the original bug.
++
++- **Registry miss reproduces no bare TypeError** (direct regression test for the
++  reported crash) + **registry miss produces a structured error**
++- **Fix verification**: after registering strategies/providers, a real run
++  succeeds with `sourcesAttempted > 0`
++- **Unknown provider** is skipped, not fatal
++- **Missing provider mapping**: `resolveDiscoverySources` with zero providers
++  registered falls back to the default source instead of throwing
++- **Invalid custom URL**: a URL that matches a provider by substring but fails
++  `new URL()` parsing is rejected gracefully
++- **Malformed `discoverySources` entry** (missing/empty url) is skipped
++- **Empty discovery group** resolves to the default fallback
++- **Group lookup that throws** does not abort discovery
++- **Mixed valid + invalid providers** in one run: the valid source is still
++  processed and telemetry correctly reports 1 resolved / 1 unresolved
++
++## Verification run
++
++```
++npm run typecheck   -> PASS (0 errors)
++npm test             -> 115/116 passing (1 pre-existing, unrelated failure - see below)
++npm run build        -> PASS (Next.js production build succeeds)
++```
++
++**Real hunt**, executed through the actual production entry point
++(`missionManager.start()` -> `runMission()` -> `runIngestionPipeline()` ->
++`runDiscovery()`, completely unmodified from that point on), with a hunt
++config containing one resolvable URL (`https://boards.greenhouse.io/acme`)
++and one intentionally unresolvable one (`unrecognized-source-identifier`):
++
++```
++Run status: COMPLETED | stage: FINISHED
++Failures recorded: []
++SOURCE_RESOLUTION_COMPLETED: { sourcesResolved: 1, sourcesUnresolved: 0, resolvedProviders: ["Greenhouse ATS"] }
++STRATEGY_COMPLETED: { sourcesAttempted: 1, sourcesSuccessful: 1, sourcesFailed: 0, jobsDiscovered: 0 }
++Contains original "Cannot read properties of undefined" crash: false
++```
++
++Acceptance criteria:
++- Providers Used > 0 -> **1** (Greenhouse ATS) ✓
++- Sources Attempted > 0 -> **1** ✓
++- Sources Completed > 0 -> **1** ✓
++- No "Cannot read properties of undefined (reading 'name')" -> **confirmed absent** ✓
++- Unknown provider correctly skipped without aborting the run ✓
++
++`jobsDiscovered` is `0` because this sandbox's network egress is restricted to a
++fixed allow-list (npm/GitHub/PyPI/crates infrastructure only) and cannot reach
++`boards.greenhouse.io`; `GreenhouseProvider.discover()` catches that fetch failure
++internally and still returns a normal (empty) result, which is why the source
++still counts as *completed* rather than *failed*. This is an environment
++limitation of the verification sandbox, not a behavior of the fix - the exact
++same run against real network access would populate `unstructuredText`/`jobs`
++from the live Greenhouse board.
++
++The PREFLIGHT stage's `agy` CLI check was bypassed for this verification run via
++the app's own existing checkpoint/resume mechanism (`lastCheckpoint:
++'PREFLIGHT_COMPLETED'`), because the `agy` binary isn't installed in this sandbox.
++This is unrelated to the RETRIEVAL bug - everything from `DISCOVERY_STARTED`
++onward in the log above ran completely unmodified.
++
++## Remaining risks
++
++- **Pre-existing, unrelated test failure**: `src/tests/runner-failure.test.ts`
++  ("should classify timeout correctly") fails identically on a clean `origin/main`
++  before any of this hotfix's changes - confirmed via `git stash` + isolated run.
++  It's an AGY error-classification issue (`AGY_UNAVAILABLE` vs `AGY_TIMEOUT`),
++  unrelated to discovery/retrieval. Left untouched, out of scope for this hotfix.
++- **`RunControls.tsx` calls `/api/runs/[id]/control`, which does not exist**
++  anywhere in `src/app` (confirmed both before and after pulling the latest
++  `origin/main`). This means the UI's actual "Start Hunt" button currently has
++  no backend route to hit at all - a separate, pre-existing gap, not introduced
++  or fixed here. Once that route is built, it will inherit this hotfix
++  automatically as long as it goes through `missionManager.start()`.
++- **`src/scripts/migrate.ts`** does not create the `data/` directory itself
++  (unlike `db/client.ts`, which does as a side effect) - a fresh checkout can
++  fail migration with "Cannot open database because the directory does not
++  exist" until `data/` exists once. Minor, unrelated, noted but not fixed here.
++- `bootstrap()` is a synchronous, in-memory, process-global registration. It is
++  safe under this app's current single-process model but would need revisiting
++  if the app ever moves to a multi-process/serverless execution model where
++  `MissionManager` instances don't share memory with whatever handles the actual
++  provider registry - not a concern today, flagged for awareness only.
+diff --git a/src/lib/discovery/orchestrator.ts b/src/lib/discovery/orchestrator.ts
+index dc98b27..52cd553 100644
+--- a/src/lib/discovery/orchestrator.ts
++++ b/src/lib/discovery/orchestrator.ts
+@@ -13,10 +13,34 @@ export async function runDiscovery(runId: string, config: any, abortSignal?: Abo
+   console.log(`[Discovery] Starting discovery for run ${runId}`);
+   
+   // 1. Resolve Strategy
++  // NOTE: strategyRegistry is populated by bootstrap() (see missionManager.start()).
++  // A registry miss here (unknown id AND missing default) is a structured,
++  // diagnosable failure rather than a bare TypeError - see V1_0_1_A5_2 hotfix.
+   const strategyName = config.discoveryStrategy || 'strategy_default';
+-  const strategy = strategyRegistry.get(strategyName) || strategyRegistry.get('strategy_default')!;
+-  
+-  console.log(`[Discovery] Using strategy: ${strategy.name}`);
++  const requestedStrategy = strategyRegistry.get(strategyName);
++  const fallbackStrategy = requestedStrategy ? undefined : strategyRegistry.get('strategy_default');
++  const strategy = requestedStrategy || fallbackStrategy;
++
++  const registeredStrategyIds = strategyRegistry.getAll().map(s => s.id);
++
++  if (!strategy) {
++    const message = `[Discovery] Strategy resolution failed: requested '${strategyName}' not found and fallback 'strategy_default' also not found. ` +
++      `Registry currently has ${registeredStrategyIds.length} strategies registered (${registeredStrategyIds.join(', ') || 'none'}). ` +
++      `This usually means bootstrap() was not called before discovery started.`;
++    console.error(message);
++    await repos.saveEvent({
++      id: crypto.randomUUID(),
++      runId,
++      timestamp: new Date().toISOString(),
++      eventType: 'STRATEGY_RESOLUTION_FAILED',
++      stage: 'DISCOVERY',
++      payload: { requestedStrategy: strategyName, registeredStrategyIds }
++    });
++    throw new Error(message);
++  }
++
++  const usedFallbackStrategy = !requestedStrategy;
++  console.log(`[Discovery] Using strategy: ${strategy.name} (requested: '${strategyName}'${usedFallbackStrategy ? ', fell back to default' : ''})`);
+   const strategyConfig = strategy.getConfiguration();
+ 
+   await repos.saveEvent({
+@@ -25,7 +49,13 @@ export async function runDiscovery(runId: string, config: any, abortSignal?: Abo
+     timestamp: new Date().toISOString(),
+     eventType: 'STRATEGY_STARTED',
+     stage: 'DISCOVERY',
+-    payload: { strategy: strategy.name, budget: strategyConfig.maxBudgetMs }
++    payload: {
++      strategy: strategy.name,
++      strategyId: strategy.id,
++      requestedStrategyId: strategyName,
++      usedFallbackStrategy,
++      budget: strategyConfig.maxBudgetMs
++    }
+   });
+ 
+   // 2. Resolve Sources (Groups, User URLs, Default fallback)
+@@ -34,6 +64,33 @@ export async function runDiscovery(runId: string, config: any, abortSignal?: Abo
+   // 3. Prioritize Sources via Strategy
+   const prioritizedSources = strategy.prioritizeSources(baseSources);
+ 
++  // Resolve which registered provider (if any) will actually handle each
++  // source, so telemetry shows resolution results even for sources that
++  // never get attempted due to early termination.
++  const sourceResolution = prioritizedSources.map(s => {
++    const resolvedProvider = providerRegistry.findProviderForUrl(s.url);
++    return { url: s.url, requestedType: s.type, resolvedProviderId: resolvedProvider?.id ?? null, resolvedProviderName: resolvedProvider?.name ?? null };
++  });
++  const unresolvedSources = sourceResolution.filter(s => !s.resolvedProviderId);
++
++  await repos.saveEvent({
++    id: crypto.randomUUID(),
++    runId,
++    timestamp: new Date().toISOString(),
++    eventType: 'SOURCE_RESOLUTION_COMPLETED',
++    stage: 'DISCOVERY',
++    payload: {
++      sourcesResolved: sourceResolution.length - unresolvedSources.length,
++      sourcesUnresolved: unresolvedSources.length,
++      resolvedProviders: [...new Set(sourceResolution.filter(s => s.resolvedProviderId).map(s => s.resolvedProviderName))],
++      unresolvedUrls: unresolvedSources.map(s => s.url)
++    }
++  });
++
++  if (unresolvedSources.length > 0) {
++    console.warn(`[Discovery] ${unresolvedSources.length} source(s) had no matching provider and will be skipped: ${unresolvedSources.map(s => s.url).join(', ')}`);
++  }
++
+   let allJobs: DiscoveredJob[] = [];
+   let allUnstructured = '';
+ 
+@@ -78,7 +135,24 @@ export async function runDiscovery(runId: string, config: any, abortSignal?: Abo
+       break;
+     }
+ 
+-    const provider = providerRegistry.findProviderForUrl(source.url);
++    // Resolve provider defensively: a malformed source URL or a misbehaving
++    // provider.supports() implementation must skip this single source, not
++    // abort discovery for every remaining source.
++    let provider;
++    try {
++      provider = providerRegistry.findProviderForUrl(source.url);
++    } catch (e: any) {
++      console.warn(`[Discovery] Provider resolution threw for source '${source.url}', skipping this source: ${e.message}`);
++      await repos.saveEvent({
++        id: crypto.randomUUID(),
++        runId,
++        timestamp: new Date().toISOString(),
++        eventType: 'PROVIDER_RESOLUTION_FAILED',
++        stage: 'DISCOVERY',
++        payload: { url: source.url, error: e.message }
++      });
++      continue;
++    }
+     if (!provider) continue;
+ 
+     sourcesAttempted++;
+diff --git a/src/lib/discovery/source-manager.ts b/src/lib/discovery/source-manager.ts
+index 666b9ca..a4ea56c 100644
+--- a/src/lib/discovery/source-manager.ts
++++ b/src/lib/discovery/source-manager.ts
+@@ -4,15 +4,25 @@ import { providerRegistry } from './registry.js';
+ import type { DiscoverySourceTarget } from './strategy/interfaces.js';
+ 
+ export async function identifyAndPersistUserSource(url: string, groupId?: string): Promise<DiscoverySourceTarget | null> {
+-  const provider = providerRegistry.findProviderForUrl(url);
++  const provider = safeFindProviderForUrl(url);
+   if (!provider) {
+     console.warn(`[SourceManager] Unrecognized provider for URL: ${url}`);
+     return null; // For now we drop unidentifiable URLs or we could fallback to generic
+   }
+ 
++  // An invalid custom URL (fails WHATWG URL parsing) must be rejected
++  // gracefully here, not thrown - this is a user-supplied string.
++  let hostname: string;
++  try {
++    hostname = new URL(url).hostname;
++  } catch (e) {
++    console.warn(`[SourceManager] Invalid custom URL rejected: ${url}`);
++    return null;
++  }
++
+   const sourceData = {
+     id: crypto.randomUUID(),
+-    name: new URL(url).hostname,
++    name: hostname,
+     provider: provider.name,
+     url,
+     enabled: 1, // boolean as integer
+@@ -36,7 +46,20 @@ export async function identifyAndPersistUserSource(url: string, groupId?: string
+     // If it already exists, ignore
+   }
+ 
+-  return { url, type: providerRegistry.findProviderForUrl(url)?.name === 'Search Engine Discovery' ? 'SEARCH_ENGINE' : 'CUSTOM_URL' }; 
++  return { url, type: provider.name === 'Search Engine Discovery' ? 'SEARCH_ENGINE' : 'CUSTOM_URL' };
++}
++
++// Resolves a provider for a URL defensively: a malformed URL or a
++// misbehaving provider.supports() must never abort resolution of the
++// remaining sources (V1_0_1_A5_2 hardening).
++function safeFindProviderForUrl(url: unknown): { name: string } | undefined {
++  if (typeof url !== 'string' || url.length === 0) return undefined;
++  try {
++    return providerRegistry.findProviderForUrl(url);
++  } catch (e) {
++    console.warn(`[SourceManager] Provider lookup threw for URL '${url}', treating as unresolved:`, e);
++    return undefined;
++  }
+ }
+ 
+ export async function resolveDiscoverySources(config: any): Promise<DiscoverySourceTarget[]> {
+@@ -51,30 +74,49 @@ export async function resolveDiscoverySources(config: any): Promise<DiscoverySou
+   };
+ 
+   // 1. Configured Explicit Sources
++  // Guard against malformed entries (missing/invalid url) so one bad
++  // configured source can't throw inside downstream provider.supports()
++  // calls and abort the whole hunt.
+   if (config.discoverySources && Array.isArray(config.discoverySources)) {
+     for (const s of config.discoverySources) {
+-      addSource(s.url, s.type);
++      if (!s || typeof s.url !== 'string' || s.url.length === 0) {
++        console.warn('[SourceManager] Skipping configured source with invalid/missing url:', s);
++        continue;
++      }
++      addSource(s.url, s.type || 'CUSTOM_URL');
+     }
+   }
+ 
+   // 2. User Provided URLs (Direct paste)
++  // Invalid/unrecognized pasted URLs are simply skipped, not fatal.
+   if (config.userUrls && Array.isArray(config.userUrls)) {
+     for (const url of config.userUrls) {
+-      const provider = providerRegistry.findProviderForUrl(url);
++      const provider = safeFindProviderForUrl(url);
+       if (provider) {
+         addSource(url, provider.name);
++      } else {
++        console.warn(`[SourceManager] Unrecognized/invalid user URL, skipping: ${url}`);
+       }
+     }
+   }
+ 
+   // 3. Groups (e.g. ['group_startups', 'group_remote'])
++  // A missing group, an empty group, or a group referencing a deleted
++  // source all resolve to "nothing to add" rather than throwing.
+   if (config.discoveryGroups && Array.isArray(config.discoveryGroups)) {
+     for (const groupId of config.discoveryGroups) {
+-      const members = await repos.getGroupMembers(groupId);
++      let members: Awaited<ReturnType<typeof repos.getGroupMembers>> = [];
++      try {
++        members = await repos.getGroupMembers(groupId);
++      } catch (e) {
++        console.warn(`[SourceManager] Failed to load members for group '${groupId}', treating as empty:`, e);
++        continue;
++      }
+       for (const member of members) {
+-        const source = await repos.getSource(member.sourceId!);
++        if (!member.sourceId) continue;
++        const source = await repos.getSource(member.sourceId);
+         if (source && source.url) {
+-          const provider = providerRegistry.findProviderForUrl(source.url);
++          const provider = safeFindProviderForUrl(source.url);
+           addSource(source.url, provider ? provider.name : 'CUSTOM_URL');
+         }
+       }
+diff --git a/src/lib/pipeline/missionManager.ts b/src/lib/pipeline/missionManager.ts
+index cc121fd..bdf174e 100644
+--- a/src/lib/pipeline/missionManager.ts
++++ b/src/lib/pipeline/missionManager.ts
+@@ -4,6 +4,7 @@ import { eq, and, isNull, lt } from 'drizzle-orm';
+ import { runMission } from './orchestrator';
+ import crypto from 'crypto';
+ import { emitEvent } from './events';
++import { bootstrap } from '../bootstrap';
+ 
+ export type MissionState = 'CREATED' | 'PREFLIGHT' | 'DISCOVERING' | 'INGESTING' | 'QUALIFYING' | 'RESEARCHING' | 'RANKING' | 'COMPLETED' | 'PAUSED' | 'CANCELLING' | 'CANCELLED' | 'FAILED' | 'INTERRUPTED';
+ 
+@@ -18,6 +19,15 @@ class MissionManager {
+   private heartbeatInterval: NodeJS.Timeout | null = null;
+ 
+   async start(runId: string) {
++    // ROOT CAUSE FIX (V1_0_1_A5_2): registers all discovery providers and
++    // strategies before any run can execute. Previously bootstrap() was only
++    // ever invoked from test files, so a real run's in-memory provider/strategy
++    // registries were empty, causing an immediate crash in discovery/orchestrator.ts
++    // ("Cannot read properties of undefined (reading 'name')") before any
++    // Provider.discover() ran. bootstrap() is idempotent (no-ops after the first
++    // call), so calling it here on every start() is safe and cheap.
++    bootstrap();
++
+     if (this.activeRunId && this.activeRunId !== runId) {
+       throw new Error(`Another run (${this.activeRunId}) is already active locally. Please cancel it first.`);
+     }
+diff --git a/src/tests/discovery-retrieval-hotfix.test.ts b/src/tests/discovery-retrieval-hotfix.test.ts
+new file mode 100644
+index 0000000..998342a
+--- /dev/null
++++ b/src/tests/discovery-retrieval-hotfix.test.ts
+@@ -0,0 +1,198 @@
++/**
++ * V1_0_1_A5_2 - RETRIEVAL Provider Hotfix regression tests.
++ *
++ * Original bug: runDiscovery() crashed with
++ *   "Cannot read properties of undefined (reading 'name')"
++ * before any Provider.discover() ran, because bootstrap() (which registers
++ * discovery providers and strategies) was only ever called from test files,
++ * never from any real production entry point. See:
++ *   docs/V1_0_1_A5_2_PROVIDER_HOTFIX.md
++ *
++ * This file deliberately does NOT call bootstrap() at module scope (unlike
++ * discovery.test.ts / strategy.test.ts) so each test can control the exact
++ * registry state it needs, including the empty-registry state that caused
++ * the original crash. Vitest isolates modules per test file by default
++ * (see vitest.config.ts - no isolate/pool override), so this file's use of
++ * providerRegistry.clear() / strategyRegistry.clear() does not affect the
++ * singletons used by other test files.
++ */
++import { describe, it, expect, vi, beforeEach } from 'vitest';
++import { providerRegistry } from '../lib/discovery/registry.js';
++import { strategyRegistry } from '../lib/discovery/strategy/registry.js';
++import { runDiscovery } from '../lib/discovery/orchestrator.js';
++import { resolveDiscoverySources, identifyAndPersistUserSource } from '../lib/discovery/source-manager.js';
++import { registerCoreProviders, GreenhouseProvider } from '../lib/discovery/providers/index.js';
++import { registerCoreStrategies } from '../lib/discovery/strategy/index.js';
++import * as repos from '../lib/db/repositories/index.js';
++
++vi.mock('../lib/db/repositories/index.js', async (importOriginal) => {
++  const actual = await importOriginal<any>();
++  return {
++    ...actual,
++    saveEvent: vi.fn(),
++    getGroupMembers: vi.fn(),
++    getSource: vi.fn(),
++  };
++});
++
++vi.mock('../lib/agy/runner.js', () => ({
++  runAgyUnstructured: vi.fn().mockResolvedValue('Mocked search engine results'),
++}));
++
++global.fetch = vi.fn().mockResolvedValue({
++  ok: true,
++  text: async () => 'Mocked provider HTML content',
++}) as any;
++
++beforeEach(() => {
++  providerRegistry.clear();
++  strategyRegistry.clear();
++  vi.mocked(repos.saveEvent).mockClear();
++  vi.mocked(repos.getGroupMembers).mockReset();
++  vi.mocked(repos.getSource).mockReset();
++});
++
++describe('V1_0_1_A5_2: RETRIEVAL registry-miss hotfix', () => {
++  it('REGRESSION: does not throw the original bare TypeError when the registry is empty', async () => {
++    // Reproduces the exact production conditions of the original bug:
++    // bootstrap() never called, so both registries are empty.
++    const config = { targetRoles: ['Software Engineer'] };
++
++    let caught: any;
++    try {
++      await runDiscovery('run_regression', config);
++    } catch (e) {
++      caught = e;
++    }
++
++    expect(caught).toBeDefined();
++    expect(caught.message).not.toMatch(/Cannot read propert/i);
++  });
++
++  it('registry miss produces a structured error identifying the missing strategy', async () => {
++    const config = { targetRoles: ['Software Engineer'], discoveryStrategy: 'strategy_does_not_exist' };
++
++    await expect(runDiscovery('run_registry_miss', config)).rejects.toThrow(/Strategy resolution failed/);
++
++    const failedEvent = vi.mocked(repos.saveEvent).mock.calls
++      .map(c => c[0])
++      .find((e: any) => e.eventType === 'STRATEGY_RESOLUTION_FAILED');
++    expect(failedEvent).toBeDefined();
++    expect((failedEvent as any).payload.requestedStrategy).toBe('strategy_does_not_exist');
++  });
++
++  it('FIX VERIFICATION: after bootstrap-equivalent registration, a real run succeeds with providers > 0', async () => {
++    registerCoreStrategies();
++    registerCoreProviders();
++
++    const config = {
++      targetRoles: ['Software Engineer'],
++      discoverySources: [{ url: 'https://boards.greenhouse.io/acme', type: 'GREENHOUSE' }],
++    };
++
++    const result = await runDiscovery('run_fixed', config);
++    expect(result).toBeDefined();
++
++    const completed = vi.mocked(repos.saveEvent).mock.calls
++      .map(c => c[0])
++      .find((e: any) => e.eventType === 'STRATEGY_COMPLETED');
++    expect(completed).toBeDefined();
++    expect((completed as any).payload.sourcesAttempted).toBeGreaterThan(0);
++  });
++});
++
++describe('V1_0_1_A5_2: unknown / missing provider mapping', () => {
++  it('unknown provider: a source matching no registered provider is skipped, not fatal', async () => {
++    registerCoreStrategies();
++    // Deliberately register zero providers - every source is "unknown".
++
++    const config = {
++      targetRoles: ['Software Engineer'],
++      // Not an http(s) URL, so even the generic CareersPageProvider
++      // catch-all (which matches any http/https URL) can't claim it.
++      discoverySources: [{ url: 'unrecognized-source-identifier', type: 'UNKNOWN_TYPE' }],
++    };
++
++    const result = await runDiscovery('run_unknown_provider', config);
++    expect(result.jobs).toEqual([]);
++
++    const completed = vi.mocked(repos.saveEvent).mock.calls
++      .map(c => c[0])
++      .find((e: any) => e.eventType === 'STRATEGY_COMPLETED');
++    expect((completed as any).payload.sourcesAttempted).toBe(0);
++  });
++
++  it('missing provider mapping: resolveDiscoverySources falls back to the default source instead of throwing', async () => {
++    // No providers registered at all.
++    const sources = await resolveDiscoverySources({ userUrls: ['https://boards.greenhouse.io/acme'] });
++    expect(sources).toEqual([{ url: 'SEARCH_ENGINE', type: 'SEARCH_ENGINE' }]);
++  });
++});
++
++describe('V1_0_1_A5_2: invalid custom URLs never abort the hunt', () => {
++  it('a URL that matches a provider by substring but fails URL parsing is rejected gracefully, not thrown', async () => {
++    providerRegistry.register(new GreenhouseProvider());
++    vi.mocked(repos.getGroupMembers).mockResolvedValue([]);
++
++    // No scheme - matches GreenhouseProvider.supports() via substring match,
++    // but `new URL(...)` on this throws. Previously uncaught.
++    const result = await identifyAndPersistUserSource('boards.greenhouse.io/careers');
++    expect(result).toBeNull();
++  });
++
++  it('a discoverySources entry with a missing/empty url is skipped, not thrown', async () => {
++    const sources = await resolveDiscoverySources({
++      discoverySources: [
++        { type: 'CUSTOM' }, // no url at all
++        { url: '', type: 'CUSTOM' }, // empty url
++        { url: 'https://boards.greenhouse.io/acme', type: 'GREENHOUSE' }, // valid
++      ],
++    });
++    expect(sources).toEqual([{ url: 'https://boards.greenhouse.io/acme', type: 'GREENHOUSE' }]);
++  });
++});
++
++describe('V1_0_1_A5_2: empty / missing discovery groups', () => {
++  it('a group with zero members resolves to the default search-engine fallback', async () => {
++    vi.mocked(repos.getGroupMembers).mockResolvedValue([]);
++
++    const sources = await resolveDiscoverySources({ discoveryGroups: ['group_empty'] });
++    expect(sources).toEqual([{ url: 'SEARCH_ENGINE', type: 'SEARCH_ENGINE' }]);
++  });
++
++  it('a group lookup that throws (e.g. deleted group) does not abort discovery', async () => {
++    vi.mocked(repos.getGroupMembers).mockRejectedValue(new Error('no such table row'));
++
++    const sources = await resolveDiscoverySources({ discoveryGroups: ['group_deleted'] });
++    expect(sources).toEqual([{ url: 'SEARCH_ENGINE', type: 'SEARCH_ENGINE' }]);
++  });
++});
++
++describe('V1_0_1_A5_2: mixed valid + invalid providers', () => {
++  it('valid sources still get processed when other sources in the same run are invalid/unknown', async () => {
++    registerCoreStrategies();
++    registerCoreProviders();
++
++    const config = {
++      targetRoles: ['Software Engineer'],
++      discoverySources: [
++        { url: 'https://boards.greenhouse.io/acme', type: 'GREENHOUSE' }, // valid
++        // Not http(s), so it can't fall through to the generic CareersPageProvider catch-all.
++        { url: 'unrecognized-source-identifier', type: 'UNKNOWN_TYPE' }, // unresolvable
++        { url: '', type: 'CUSTOM' }, // malformed
++      ],
++    };
++
++    const result = await runDiscovery('run_mixed', config);
++    expect(result).toBeDefined();
++
++    const eventTypes = vi.mocked(repos.saveEvent).mock.calls.map(c => (c[0] as any).eventType);
++    expect(eventTypes).toContain('PROVIDER_STARTED');
++
++    const resolution = vi.mocked(repos.saveEvent).mock.calls
++      .map(c => c[0])
++      .find((e: any) => e.eventType === 'SOURCE_RESOLUTION_COMPLETED');
++    expect((resolution as any).payload.sourcesResolved).toBe(1);
++    expect((resolution as any).payload.sourcesUnresolved).toBe(1);
++  });
++});

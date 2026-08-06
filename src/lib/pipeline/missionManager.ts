@@ -4,6 +4,7 @@ import { eq, and, isNull, lt } from 'drizzle-orm';
 import { runMission } from './orchestrator';
 import crypto from 'crypto';
 import { emitEvent } from './events';
+import { bootstrap } from '../bootstrap';
 
 export type MissionState = 'CREATED' | 'PREFLIGHT' | 'DISCOVERING' | 'INGESTING' | 'QUALIFYING' | 'RESEARCHING' | 'RANKING' | 'COMPLETED' | 'PAUSED' | 'CANCELLING' | 'CANCELLED' | 'FAILED' | 'INTERRUPTED';
 
@@ -18,6 +19,15 @@ class MissionManager {
   private heartbeatInterval: NodeJS.Timeout | null = null;
 
   async start(runId: string) {
+    // ROOT CAUSE FIX (V1_0_1_A5_2): registers all discovery providers and
+    // strategies before any run can execute. Previously bootstrap() was only
+    // ever invoked from test files, so a real run's in-memory provider/strategy
+    // registries were empty, causing an immediate crash in discovery/orchestrator.ts
+    // ("Cannot read properties of undefined (reading 'name')") before any
+    // Provider.discover() ran. bootstrap() is idempotent (no-ops after the first
+    // call), so calling it here on every start() is safe and cheap.
+    bootstrap();
+
     if (this.activeRunId && this.activeRunId !== runId) {
       throw new Error(`Another run (${this.activeRunId}) is already active locally. Please cancel it first.`);
     }

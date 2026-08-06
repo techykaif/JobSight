@@ -4,15 +4,25 @@ import { providerRegistry } from './registry.js';
 import type { DiscoverySourceTarget } from './strategy/interfaces.js';
 
 export async function identifyAndPersistUserSource(url: string, groupId?: string): Promise<DiscoverySourceTarget | null> {
-  const provider = providerRegistry.findProviderForUrl(url);
+  const provider = safeFindProviderForUrl(url);
   if (!provider) {
     console.warn(`[SourceManager] Unrecognized provider for URL: ${url}`);
     return null; // For now we drop unidentifiable URLs or we could fallback to generic
   }
 
+  // An invalid custom URL (fails WHATWG URL parsing) must be rejected
+  // gracefully here, not thrown - this is a user-supplied string.
+  let hostname: string;
+  try {
+    hostname = new URL(url).hostname;
+  } catch (e) {
+    console.warn(`[SourceManager] Invalid custom URL rejected: ${url}`);
+    return null;
+  }
+
   const sourceData = {
     id: crypto.randomUUID(),
-    name: new URL(url).hostname,
+    name: hostname,
     provider: provider.name,
     url,
     enabled: 1, // boolean as integer
@@ -36,7 +46,20 @@ export async function identifyAndPersistUserSource(url: string, groupId?: string
     // If it already exists, ignore
   }
 
-  return { url, type: providerRegistry.findProviderForUrl(url)?.name === 'Search Engine Discovery' ? 'SEARCH_ENGINE' : 'CUSTOM_URL' }; 
+  return { url, type: provider.name === 'Search Engine Discovery' ? 'SEARCH_ENGINE' : 'CUSTOM_URL' };
+}
+
+// Resolves a provider for a URL defensively: a malformed URL or a
+// misbehaving provider.supports() must never abort resolution of the
+// remaining sources (V1_0_1_A5_2 hardening).
+function safeFindProviderForUrl(url: unknown): { name: string } | undefined {
+  if (typeof url !== 'string' || url.length === 0) return undefined;
+  try {
+    return providerRegistry.findProviderForUrl(url);
+  } catch (e) {
+    console.warn(`[SourceManager] Provider lookup threw for URL '${url}', treating as unresolved:`, e);
+    return undefined;
+  }
 }
 
 export async function resolveDiscoverySources(config: any): Promise<DiscoverySourceTarget[]> {
@@ -51,30 +74,49 @@ export async function resolveDiscoverySources(config: any): Promise<DiscoverySou
   };
 
   // 1. Configured Explicit Sources
+  // Guard against malformed entries (missing/invalid url) so one bad
+  // configured source can't throw inside downstream provider.supports()
+  // calls and abort the whole hunt.
   if (config.discoverySources && Array.isArray(config.discoverySources)) {
     for (const s of config.discoverySources) {
-      addSource(s.url, s.type);
+      if (!s || typeof s.url !== 'string' || s.url.length === 0) {
+        console.warn('[SourceManager] Skipping configured source with invalid/missing url:', s);
+        continue;
+      }
+      addSource(s.url, s.type || 'CUSTOM_URL');
     }
   }
 
   // 2. User Provided URLs (Direct paste)
+  // Invalid/unrecognized pasted URLs are simply skipped, not fatal.
   if (config.userUrls && Array.isArray(config.userUrls)) {
     for (const url of config.userUrls) {
-      const provider = providerRegistry.findProviderForUrl(url);
+      const provider = safeFindProviderForUrl(url);
       if (provider) {
         addSource(url, provider.name);
+      } else {
+        console.warn(`[SourceManager] Unrecognized/invalid user URL, skipping: ${url}`);
       }
     }
   }
 
   // 3. Groups (e.g. ['group_startups', 'group_remote'])
+  // A missing group, an empty group, or a group referencing a deleted
+  // source all resolve to "nothing to add" rather than throwing.
   if (config.discoveryGroups && Array.isArray(config.discoveryGroups)) {
     for (const groupId of config.discoveryGroups) {
-      const members = await repos.getGroupMembers(groupId);
+      let members: Awaited<ReturnType<typeof repos.getGroupMembers>> = [];
+      try {
+        members = await repos.getGroupMembers(groupId);
+      } catch (e) {
+        console.warn(`[SourceManager] Failed to load members for group '${groupId}', treating as empty:`, e);
+        continue;
+      }
       for (const member of members) {
-        const source = await repos.getSource(member.sourceId!);
+        if (!member.sourceId) continue;
+        const source = await repos.getSource(member.sourceId);
         if (source && source.url) {
-          const provider = providerRegistry.findProviderForUrl(source.url);
+          const provider = safeFindProviderForUrl(source.url);
           addSource(source.url, provider ? provider.name : 'CUSTOM_URL');
         }
       }

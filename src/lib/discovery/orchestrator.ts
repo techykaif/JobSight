@@ -13,10 +13,34 @@ export async function runDiscovery(runId: string, config: any, abortSignal?: Abo
   console.log(`[Discovery] Starting discovery for run ${runId}`);
   
   // 1. Resolve Strategy
+  // NOTE: strategyRegistry is populated by bootstrap() (see missionManager.start()).
+  // A registry miss here (unknown id AND missing default) is a structured,
+  // diagnosable failure rather than a bare TypeError - see V1_0_1_A5_2 hotfix.
   const strategyName = config.discoveryStrategy || 'strategy_default';
-  const strategy = strategyRegistry.get(strategyName) || strategyRegistry.get('strategy_default')!;
-  
-  console.log(`[Discovery] Using strategy: ${strategy.name}`);
+  const requestedStrategy = strategyRegistry.get(strategyName);
+  const fallbackStrategy = requestedStrategy ? undefined : strategyRegistry.get('strategy_default');
+  const strategy = requestedStrategy || fallbackStrategy;
+
+  const registeredStrategyIds = strategyRegistry.getAll().map(s => s.id);
+
+  if (!strategy) {
+    const message = `[Discovery] Strategy resolution failed: requested '${strategyName}' not found and fallback 'strategy_default' also not found. ` +
+      `Registry currently has ${registeredStrategyIds.length} strategies registered (${registeredStrategyIds.join(', ') || 'none'}). ` +
+      `This usually means bootstrap() was not called before discovery started.`;
+    console.error(message);
+    await repos.saveEvent({
+      id: crypto.randomUUID(),
+      runId,
+      timestamp: new Date().toISOString(),
+      eventType: 'STRATEGY_RESOLUTION_FAILED',
+      stage: 'DISCOVERY',
+      payload: { requestedStrategy: strategyName, registeredStrategyIds }
+    });
+    throw new Error(message);
+  }
+
+  const usedFallbackStrategy = !requestedStrategy;
+  console.log(`[Discovery] Using strategy: ${strategy.name} (requested: '${strategyName}'${usedFallbackStrategy ? ', fell back to default' : ''})`);
   const strategyConfig = strategy.getConfiguration();
 
   await repos.saveEvent({
@@ -25,7 +49,13 @@ export async function runDiscovery(runId: string, config: any, abortSignal?: Abo
     timestamp: new Date().toISOString(),
     eventType: 'STRATEGY_STARTED',
     stage: 'DISCOVERY',
-    payload: { strategy: strategy.name, budget: strategyConfig.maxBudgetMs }
+    payload: {
+      strategy: strategy.name,
+      strategyId: strategy.id,
+      requestedStrategyId: strategyName,
+      usedFallbackStrategy,
+      budget: strategyConfig.maxBudgetMs
+    }
   });
 
   // 2. Resolve Sources (Groups, User URLs, Default fallback)
@@ -33,6 +63,33 @@ export async function runDiscovery(runId: string, config: any, abortSignal?: Abo
 
   // 3. Prioritize Sources via Strategy
   const prioritizedSources = strategy.prioritizeSources(baseSources);
+
+  // Resolve which registered provider (if any) will actually handle each
+  // source, so telemetry shows resolution results even for sources that
+  // never get attempted due to early termination.
+  const sourceResolution = prioritizedSources.map(s => {
+    const resolvedProvider = providerRegistry.findProviderForUrl(s.url);
+    return { url: s.url, requestedType: s.type, resolvedProviderId: resolvedProvider?.id ?? null, resolvedProviderName: resolvedProvider?.name ?? null };
+  });
+  const unresolvedSources = sourceResolution.filter(s => !s.resolvedProviderId);
+
+  await repos.saveEvent({
+    id: crypto.randomUUID(),
+    runId,
+    timestamp: new Date().toISOString(),
+    eventType: 'SOURCE_RESOLUTION_COMPLETED',
+    stage: 'DISCOVERY',
+    payload: {
+      sourcesResolved: sourceResolution.length - unresolvedSources.length,
+      sourcesUnresolved: unresolvedSources.length,
+      resolvedProviders: [...new Set(sourceResolution.filter(s => s.resolvedProviderId).map(s => s.resolvedProviderName))],
+      unresolvedUrls: unresolvedSources.map(s => s.url)
+    }
+  });
+
+  if (unresolvedSources.length > 0) {
+    console.warn(`[Discovery] ${unresolvedSources.length} source(s) had no matching provider and will be skipped: ${unresolvedSources.map(s => s.url).join(', ')}`);
+  }
 
   let allJobs: DiscoveredJob[] = [];
   let allUnstructured = '';
@@ -78,7 +135,24 @@ export async function runDiscovery(runId: string, config: any, abortSignal?: Abo
       break;
     }
 
-    const provider = providerRegistry.findProviderForUrl(source.url);
+    // Resolve provider defensively: a malformed source URL or a misbehaving
+    // provider.supports() implementation must skip this single source, not
+    // abort discovery for every remaining source.
+    let provider;
+    try {
+      provider = providerRegistry.findProviderForUrl(source.url);
+    } catch (e: any) {
+      console.warn(`[Discovery] Provider resolution threw for source '${source.url}', skipping this source: ${e.message}`);
+      await repos.saveEvent({
+        id: crypto.randomUUID(),
+        runId,
+        timestamp: new Date().toISOString(),
+        eventType: 'PROVIDER_RESOLUTION_FAILED',
+        stage: 'DISCOVERY',
+        payload: { url: source.url, error: e.message }
+      });
+      continue;
+    }
     if (!provider) continue;
 
     sourcesAttempted++;
