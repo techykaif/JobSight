@@ -176,33 +176,37 @@ export default function NewHuntPage() {
               <input type="hidden" name="userUrls" value={urls.join('\n')} />
 
               <div className="discovery-section">
-                <label className="section-label">Source Groups</label>
-                <div className="pill-grid">
+                <label className="section-label" id="source-groups-label">Source Groups</label>
+                <div className="pill-grid" role="group" aria-labelledby="source-groups-label">
                   {SAVED_GROUPS.map(g => (
-                    <div 
-                      key={g.id} 
+                    <button
+                      type="button"
+                      key={g.id}
                       className={`selectable-pill ${selectedGroups.has(g.id) ? 'active' : ''}`}
                       onClick={() => toggleGroup(g.id)}
+                      aria-pressed={selectedGroups.has(g.id)}
                     >
                       <span className="pill-name">{g.name}</span>
                       <span className="pill-count">{g.count}</span>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
 
               <div className="discovery-section">
-                <label className="section-label">ATS Providers</label>
-                <div className="provider-grid">
+                <label className="section-label" id="ats-providers-label">ATS Providers</label>
+                <div className="provider-grid" role="group" aria-labelledby="ats-providers-label">
                   {COMMON_PROVIDERS.map(p => (
-                    <div 
+                    <button
+                      type="button"
                       key={p.id}
                       className={`provider-card ${selectedProviders.has(p.id) ? 'active' : ''}`}
                       onClick={() => toggleProvider(p.id)}
+                      aria-pressed={selectedProviders.has(p.id)}
                     >
-                      <span className="provider-icon">{p.icon}</span>
+                      <span className="provider-icon" aria-hidden="true">{p.icon}</span>
                       <span className="provider-name">{p.name}</span>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
