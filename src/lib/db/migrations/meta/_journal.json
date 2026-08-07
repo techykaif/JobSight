@@ -71,6 +71,13 @@
       "when": 1786108874061,
       "tag": "0009_ambitious_stranger",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1786109646093,
+      "tag": "0010_phase_b5_application_intelligence",
+      "breakpoints": true
     }
   ]
 }

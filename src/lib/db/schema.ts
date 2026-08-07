@@ -582,3 +582,47 @@ export const oppDiscoverySummary = sqliteTable('opp_discovery_summary', {
   confidence: integer('confidence').notNull(),
   createdAt: text('created_at').notNull()
 });
+
+// ----------------------------------------------------------------------
+// APPLICATION INTELLIGENCE (Phase B5)
+// ----------------------------------------------------------------------
+
+export const applicationResults = sqliteTable('application_results', {
+  id: text('id').primaryKey(),
+  runId: text('run_id').references(() => runs.id),
+  jobId: text('job_id').notNull().references(() => jobs.id),
+  score: integer('score').notNull(), // 0-100
+  readinessLevel: text('readiness_level').notNull(), // Ready Now, Almost Ready, Needs Improvement, Not Recommended
+  confidence: integer('confidence').notNull(),
+  createdAt: text('created_at').notNull()
+});
+
+export const applicationSignals = sqliteTable('application_signals', {
+  id: text('id').primaryKey(),
+  runId: text('run_id').references(() => runs.id),
+  jobId: text('job_id').notNull().references(() => jobs.id),
+  signalType: text('signal_type').notNull(),
+  value: text('value'),
+  weight: integer('weight').notNull(),
+  metadata: text('metadata', { mode: 'json' }),
+  createdAt: text('created_at').notNull()
+});
+
+export const applicationSummary = sqliteTable('application_summary', {
+  id: text('id').primaryKey(),
+  runId: text('run_id').references(() => runs.id),
+  jobId: text('job_id').notNull().references(() => jobs.id),
+  strengths: text('strengths', { mode: 'json' }).notNull(), // string[]
+  weaknesses: text('weaknesses', { mode: 'json' }).notNull(), // string[]
+  missingSkills: text('missing_skills', { mode: 'json' }).notNull(), // string[]
+  riskFactors: text('risk_factors', { mode: 'json' }).notNull(), // string[]
+  createdAt: text('created_at').notNull()
+});
+
+export const applicationRecommendations = sqliteTable('application_recommendations', {
+  id: text('id').primaryKey(),
+  runId: text('run_id').references(() => runs.id),
+  jobId: text('job_id').notNull().references(() => jobs.id),
+  recommendation: text('recommendation').notNull(), // Apply Immediately, Customize Resume First, Upskill Before Applying
+  createdAt: text('created_at').notNull()
+});

@@ -10,6 +10,8 @@ import { runCompetitionIntelligence, persistCompetitionIntelligence } from '../c
 import { runCompanyOpportunityIntelligence, persistCompanyOpportunityIntelligence } from '../company-opportunity/index.js';
 import { runDiscoveryIntelligence, persistDiscoveryIntelligence } from '../discovery-intelligence/index.js';
 import type { DiscoveryIntelligenceContext } from '../discovery-intelligence/interfaces.js';
+import { runApplicationIntelligence, persistApplicationIntelligence } from '../application-intelligence/index.js';
+import type { ApplicationIntelligenceContext } from '../application-intelligence/interfaces.js';
 import { CandidateProfileSchema, type CandidateProfile } from '../qualification/schema';
 import crypto from 'crypto';
 
@@ -54,14 +56,15 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
     
     // Determine start stage based on checkpoint
     const lastCp = run.lastCheckpoint;
-    const skipPreflight = ['PREFLIGHT_COMPLETED', 'DISCOVERY_COMPLETED', 'QUALIFICATION_COMPLETED', 'COMPANY_RESEARCH_COMPLETED', 'FOUNDATION_COMPLETED', 'COMPETITION_COMPLETED', 'COMPANY_OPPORTUNITY_COMPLETED', 'DISCOVERY_INTELLIGENCE_COMPLETED'].includes(lastCp || '');
-    const skipDiscovery = ['DISCOVERY_COMPLETED', 'QUALIFICATION_COMPLETED', 'COMPANY_RESEARCH_COMPLETED', 'FOUNDATION_COMPLETED', 'COMPETITION_COMPLETED', 'COMPANY_OPPORTUNITY_COMPLETED', 'DISCOVERY_INTELLIGENCE_COMPLETED'].includes(lastCp || '');
-    const skipQualification = ['QUALIFICATION_COMPLETED', 'COMPANY_RESEARCH_COMPLETED', 'FOUNDATION_COMPLETED', 'COMPETITION_COMPLETED', 'COMPANY_OPPORTUNITY_COMPLETED', 'DISCOVERY_INTELLIGENCE_COMPLETED'].includes(lastCp || '');
-    const skipCompanyResearch = ['COMPANY_RESEARCH_COMPLETED', 'FOUNDATION_COMPLETED', 'COMPETITION_COMPLETED', 'COMPANY_OPPORTUNITY_COMPLETED', 'DISCOVERY_INTELLIGENCE_COMPLETED'].includes(lastCp || '');
-    const skipFoundation = ['FOUNDATION_COMPLETED', 'COMPETITION_COMPLETED', 'COMPANY_OPPORTUNITY_COMPLETED', 'DISCOVERY_INTELLIGENCE_COMPLETED'].includes(lastCp || '');
-    const skipCompetition = ['COMPETITION_COMPLETED', 'COMPANY_OPPORTUNITY_COMPLETED', 'DISCOVERY_INTELLIGENCE_COMPLETED'].includes(lastCp || '');
-    const skipCompanyOpportunity = ['COMPANY_OPPORTUNITY_COMPLETED', 'DISCOVERY_INTELLIGENCE_COMPLETED'].includes(lastCp || '');
-    const skipDiscoveryIntelligence = ['DISCOVERY_INTELLIGENCE_COMPLETED'].includes(lastCp || '');
+    const skipPreflight = ['PREFLIGHT_COMPLETED', 'DISCOVERY_COMPLETED', 'QUALIFICATION_COMPLETED', 'COMPANY_RESEARCH_COMPLETED', 'FOUNDATION_COMPLETED', 'COMPETITION_COMPLETED', 'COMPANY_OPPORTUNITY_COMPLETED', 'DISCOVERY_INTELLIGENCE_COMPLETED', 'APPLICATION_INTELLIGENCE_COMPLETED'].includes(lastCp || '');
+    const skipDiscovery = ['DISCOVERY_COMPLETED', 'QUALIFICATION_COMPLETED', 'COMPANY_RESEARCH_COMPLETED', 'FOUNDATION_COMPLETED', 'COMPETITION_COMPLETED', 'COMPANY_OPPORTUNITY_COMPLETED', 'DISCOVERY_INTELLIGENCE_COMPLETED', 'APPLICATION_INTELLIGENCE_COMPLETED'].includes(lastCp || '');
+    const skipQualification = ['QUALIFICATION_COMPLETED', 'COMPANY_RESEARCH_COMPLETED', 'FOUNDATION_COMPLETED', 'COMPETITION_COMPLETED', 'COMPANY_OPPORTUNITY_COMPLETED', 'DISCOVERY_INTELLIGENCE_COMPLETED', 'APPLICATION_INTELLIGENCE_COMPLETED'].includes(lastCp || '');
+    const skipCompanyResearch = ['COMPANY_RESEARCH_COMPLETED', 'FOUNDATION_COMPLETED', 'COMPETITION_COMPLETED', 'COMPANY_OPPORTUNITY_COMPLETED', 'DISCOVERY_INTELLIGENCE_COMPLETED', 'APPLICATION_INTELLIGENCE_COMPLETED'].includes(lastCp || '');
+    const skipFoundation = ['FOUNDATION_COMPLETED', 'COMPETITION_COMPLETED', 'COMPANY_OPPORTUNITY_COMPLETED', 'DISCOVERY_INTELLIGENCE_COMPLETED', 'APPLICATION_INTELLIGENCE_COMPLETED'].includes(lastCp || '');
+    const skipCompetition = ['COMPETITION_COMPLETED', 'COMPANY_OPPORTUNITY_COMPLETED', 'DISCOVERY_INTELLIGENCE_COMPLETED', 'APPLICATION_INTELLIGENCE_COMPLETED'].includes(lastCp || '');
+    const skipCompanyOpportunity = ['COMPANY_OPPORTUNITY_COMPLETED', 'DISCOVERY_INTELLIGENCE_COMPLETED', 'APPLICATION_INTELLIGENCE_COMPLETED'].includes(lastCp || '');
+    const skipDiscoveryIntelligence = ['DISCOVERY_INTELLIGENCE_COMPLETED', 'APPLICATION_INTELLIGENCE_COMPLETED'].includes(lastCp || '');
+    const skipApplicationIntelligence = ['APPLICATION_INTELLIGENCE_COMPLETED'].includes(lastCp || '');
 
     if (lastCp) {
       await emitEvent({ runId, type: 'RUN_RESUMED_FROM_CHECKPOINT', stage: 'START', message: `Resuming run from checkpoint: ${lastCp}` });
@@ -670,6 +673,93 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
       }
 
       await db.update(schema.runs).set({ lastCheckpoint: 'DISCOVERY_INTELLIGENCE_COMPLETED' }).where(eq(schema.runs.id, runId));
+    }
+
+    // APPLICATION INTELLIGENCE
+    if (!skipApplicationIntelligence) {
+      await updateState('RUNNING', 'APPLICATION_INTELLIGENCE');
+      await emitEvent({ runId, type: 'APPLICATION_INTELLIGENCE_STARTED', stage: 'APPLICATION_INTELLIGENCE' });
+
+      const runJobs = await db.select({ 
+        job: schema.jobs, 
+        company: schema.companies
+      }).from(schema.jobObservations)
+        .innerJoin(schema.jobs, eq(schema.jobObservations.jobId, schema.jobs.id))
+        .leftJoin(schema.companies, eq(schema.jobs.companyId, schema.companies.id))
+        .where(eq(schema.jobObservations.runId, runId));
+
+      for (const row of runJobs) {
+        await checkPauseOrCancel();
+        const { job, company } = row;
+
+        // get candidate profile
+        let candidateProfile: CandidateProfile | undefined;
+        const prof = await db.select().from(schema.profiles).limit(1);
+        if (prof[0]) {
+          candidateProfile = prof[0] as unknown as CandidateProfile;
+        }
+
+        // get qualification
+        let qualificationScore: number | undefined;
+        let qualificationSkills: string[] | undefined; // Not persisted cleanly right now, graceful degradation
+        const qScore = await db.select().from(schema.scores).where(eq(schema.scores.jobId, job.id)).limit(1);
+        if (qScore[0]) {
+          qualificationScore = qScore[0].scoreValue;
+        }
+
+        // get comp
+        const comp = await db.select().from(schema.competitionResults).where(eq(schema.competitionResults.jobId, job.id)).limit(1);
+        const competitionResult = comp[0] ? comp[0] : undefined;
+        
+        // get company opp
+        let companyOpportunityResult = undefined;
+        if (company) {
+          const compOpp = await db.select().from(schema.companyOpportunity).where(eq(schema.companyOpportunity.companyId, company.id)).limit(1);
+          if (compOpp[0]) companyOpportunityResult = compOpp[0];
+        }
+
+        // get discovery intelligence
+        const disc = await db.select().from(schema.oppDiscoveryResults).where(eq(schema.oppDiscoveryResults.jobId, job.id)).limit(1);
+        const discoveryIntelligenceOutput = disc[0] ? { result: disc[0] } as any : undefined;
+
+        const context: ApplicationIntelligenceContext = {
+          job,
+          runId
+        };
+        
+        if (company) context.company = company;
+        if (candidateProfile) context.candidateProfile = candidateProfile;
+        if (qualificationScore !== undefined) context.qualificationScore = qualificationScore;
+        if (qualificationSkills) context.qualificationSkills = qualificationSkills;
+        if (competitionResult) context.competitionResult = competitionResult as any;
+        if (companyOpportunityResult) context.companyOpportunityResult = companyOpportunityResult as any;
+        if (discoveryIntelligenceOutput) context.discoveryIntelligenceOutput = discoveryIntelligenceOutput;
+
+        try {
+          const appResult = await runApplicationIntelligence(context);
+          await persistApplicationIntelligence(appResult);
+          await emitEvent({
+            runId,
+            type: 'APPLICATION_INTELLIGENCE_COMPLETED',
+            stage: 'APPLICATION_INTELLIGENCE',
+            entityType: 'JOB',
+            entityId: job.id,
+            message: `Application intelligence evaluated: ${appResult.result.readinessLevel}`
+          });
+        } catch (err: any) {
+          if (err.message === 'Mission Cancelled' || err.name === 'AbortError') throw err;
+          await emitEvent({
+            runId,
+            type: 'APPLICATION_INTELLIGENCE_FAILED',
+            stage: 'APPLICATION_INTELLIGENCE',
+            entityType: 'JOB',
+            entityId: job.id,
+            message: `Application intelligence failed: ${err.message}`
+          });
+        }
+      }
+
+      await db.update(schema.runs).set({ lastCheckpoint: 'APPLICATION_INTELLIGENCE_COMPLETED' }).where(eq(schema.runs.id, runId));
     }
 
     await checkPauseOrCancel();

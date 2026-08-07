@@ -10,6 +10,8 @@ import { companyOpportunityRegistry } from './company-opportunity/registry.js';
 import { registerDefaultProviders as registerCompanyOpportunityProviders } from './company-opportunity/providers/signals.js';
 import { discoveryIntelligenceRegistry } from './discovery-intelligence/registry.js';
 import { registerDefaultProviders as registerDiscoveryIntelligenceProviders } from './discovery-intelligence/providers/signals.js';
+import { applicationIntelligenceRegistry } from './application-intelligence/registry.js';
+import { registerDefaultProviders as registerApplicationIntelligenceProviders } from './application-intelligence/providers/signals.js';
 
 let bootstrapped = false;
 
@@ -40,6 +42,9 @@ export function bootstrap() {
 
   // 4d. Discovery Intelligence
   registerDiscoveryIntelligenceProviders(discoveryIntelligenceRegistry);
+
+  // 4e. Application Intelligence
+  registerApplicationIntelligenceProviders(applicationIntelligenceRegistry);
 
   // 5. Decision Strategies (WHAT we recommend)
   registerCoreDecisionStrategies();
