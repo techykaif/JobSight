@@ -57,6 +57,13 @@
       "when": 1786107633767,
       "tag": "0007_overjoyed_mad_thinker",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1786108379751,
+      "tag": "0008_quick_alex_power",
+      "breakpoints": true
     }
   ]
 }

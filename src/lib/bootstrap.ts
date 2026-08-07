@@ -6,6 +6,8 @@ import { foundationRegistry } from './intelligence-foundation/registry.js';
 import { registerDefaultProviders } from './intelligence-foundation/providers/signals.js';
 import { competitionRegistry } from './competition/registry.js';
 import { registerDefaultProviders as registerCompetitionProviders } from './competition/providers/signals.js';
+import { companyOpportunityRegistry } from './company-opportunity/registry.js';
+import { registerDefaultProviders as registerCompanyOpportunityProviders } from './company-opportunity/providers/signals.js';
 
 let bootstrapped = false;
 
@@ -30,6 +32,9 @@ export function bootstrap() {
 
   // 4b. Competition Intelligence
   registerCompetitionProviders(competitionRegistry);
+
+  // 4c. Company Opportunity Intelligence
+  registerCompanyOpportunityProviders(companyOpportunityRegistry);
 
   // 5. Decision Strategies (WHAT we recommend)
   registerCoreDecisionStrategies();

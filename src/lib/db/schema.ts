@@ -500,3 +500,49 @@ export const competitionSummary = sqliteTable('competition_summary', {
   reasons: text('reasons', { mode: 'json' }), // string[] of '✓ Official Careers Page' etc.
   createdAt: text('created_at').notNull()
 });
+
+export const companyOpportunity = sqliteTable('company_opportunity', {
+  id: text('id').primaryKey(),
+  runId: text('run_id').references(() => runs.id),
+  companyId: text('company_id').notNull().references(() => companies.id),
+  score: integer('score').notNull(), // 0-100
+  level: text('level').notNull(), // Excellent, Strong, Good, Average, Weak
+  confidence: integer('confidence').notNull(),
+  createdAt: text('created_at').notNull()
+});
+
+export const companySignals = sqliteTable('company_signals', {
+  id: text('id').primaryKey(),
+  runId: text('run_id').references(() => runs.id),
+  companyId: text('company_id').notNull().references(() => companies.id),
+  signalType: text('signal_type').notNull(),
+  value: text('value'),
+  weight: integer('weight').notNull(),
+  metadata: text('metadata', { mode: 'json' }),
+  createdAt: text('created_at').notNull()
+});
+
+export const companySummary = sqliteTable('company_summary', {
+  id: text('id').primaryKey(),
+  runId: text('run_id').references(() => runs.id),
+  companyId: text('company_id').notNull().references(() => companies.id),
+  outlook: text('outlook').notNull(), // Excellent, Strong, etc.
+  hiringTrend: text('hiring_trend').notNull(), // Growing, Stable, Slowing, Unknown
+  remoteHiring: text('remote_hiring').notNull(),
+  engineeringHiring: text('engineering_hiring').notNull(),
+  competition: text('competition').notNull(),
+  authenticity: text('authenticity').notNull(),
+  evidenceCount: integer('evidence_count').notNull(),
+  confidence: integer('confidence').notNull(),
+  createdAt: text('created_at').notNull()
+});
+
+export const companyOutlook = sqliteTable('company_outlook', {
+  id: text('id').primaryKey(),
+  runId: text('run_id').references(() => runs.id),
+  companyId: text('company_id').notNull().references(() => companies.id),
+  trend: text('trend').notNull(), // Growing, Stable, Slowing, Unknown
+  stability: text('stability').notNull(), // High, Medium, Low
+  momentum: integer('momentum').notNull(), // 0-100
+  createdAt: text('created_at').notNull()
+});

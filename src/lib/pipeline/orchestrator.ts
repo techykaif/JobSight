@@ -7,6 +7,7 @@ import { qualifyJob } from '../qualification/engine';
 import { getCompanyIntelligence } from '../company/engine';
 import { runIntelligenceFoundation, persistIntelligenceFoundation } from '../intelligence-foundation/index.js';
 import { runCompetitionIntelligence, persistCompetitionIntelligence } from '../competition/index.js';
+import { runCompanyOpportunityIntelligence, persistCompanyOpportunityIntelligence } from '../company-opportunity/index.js';
 import { CandidateProfileSchema, type CandidateProfile } from '../qualification/schema';
 import crypto from 'crypto';
 
@@ -51,12 +52,13 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
     
     // Determine start stage based on checkpoint
     const lastCp = run.lastCheckpoint;
-    const skipPreflight = ['PREFLIGHT_COMPLETED', 'DISCOVERY_COMPLETED', 'QUALIFICATION_COMPLETED', 'COMPANY_RESEARCH_COMPLETED', 'FOUNDATION_COMPLETED', 'COMPETITION_COMPLETED'].includes(lastCp || '');
-    const skipDiscovery = ['DISCOVERY_COMPLETED', 'QUALIFICATION_COMPLETED', 'COMPANY_RESEARCH_COMPLETED', 'FOUNDATION_COMPLETED', 'COMPETITION_COMPLETED'].includes(lastCp || '');
-    const skipQualification = ['QUALIFICATION_COMPLETED', 'COMPANY_RESEARCH_COMPLETED', 'FOUNDATION_COMPLETED', 'COMPETITION_COMPLETED'].includes(lastCp || '');
-    const skipCompanyResearch = ['COMPANY_RESEARCH_COMPLETED', 'FOUNDATION_COMPLETED', 'COMPETITION_COMPLETED'].includes(lastCp || '');
-    const skipFoundation = ['FOUNDATION_COMPLETED', 'COMPETITION_COMPLETED'].includes(lastCp || '');
-    const skipCompetition = ['COMPETITION_COMPLETED'].includes(lastCp || '');
+    const skipPreflight = ['PREFLIGHT_COMPLETED', 'DISCOVERY_COMPLETED', 'QUALIFICATION_COMPLETED', 'COMPANY_RESEARCH_COMPLETED', 'FOUNDATION_COMPLETED', 'COMPETITION_COMPLETED', 'COMPANY_OPPORTUNITY_COMPLETED'].includes(lastCp || '');
+    const skipDiscovery = ['DISCOVERY_COMPLETED', 'QUALIFICATION_COMPLETED', 'COMPANY_RESEARCH_COMPLETED', 'FOUNDATION_COMPLETED', 'COMPETITION_COMPLETED', 'COMPANY_OPPORTUNITY_COMPLETED'].includes(lastCp || '');
+    const skipQualification = ['QUALIFICATION_COMPLETED', 'COMPANY_RESEARCH_COMPLETED', 'FOUNDATION_COMPLETED', 'COMPETITION_COMPLETED', 'COMPANY_OPPORTUNITY_COMPLETED'].includes(lastCp || '');
+    const skipCompanyResearch = ['COMPANY_RESEARCH_COMPLETED', 'FOUNDATION_COMPLETED', 'COMPETITION_COMPLETED', 'COMPANY_OPPORTUNITY_COMPLETED'].includes(lastCp || '');
+    const skipFoundation = ['FOUNDATION_COMPLETED', 'COMPETITION_COMPLETED', 'COMPANY_OPPORTUNITY_COMPLETED'].includes(lastCp || '');
+    const skipCompetition = ['COMPETITION_COMPLETED', 'COMPANY_OPPORTUNITY_COMPLETED'].includes(lastCp || '');
+    const skipCompanyOpportunity = ['COMPANY_OPPORTUNITY_COMPLETED'].includes(lastCp || '');
 
     if (lastCp) {
       await emitEvent({ runId, type: 'RUN_RESUMED_FROM_CHECKPOINT', stage: 'START', message: `Resuming run from checkpoint: ${lastCp}` });
@@ -505,6 +507,85 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
       }
 
       await db.update(schema.runs).set({ lastCheckpoint: 'COMPETITION_COMPLETED' }).where(eq(schema.runs.id, runId));
+    }
+
+    await checkPauseOrCancel();
+
+    // COMPANY OPPORTUNITY INTELLIGENCE
+    if (!skipCompanyOpportunity) {
+      await updateState('RUNNING', 'COMPANY_OPPORTUNITY');
+      await emitEvent({ runId, type: 'COMPANY_OPPORTUNITY_STARTED', stage: 'COMPANY_OPPORTUNITY' });
+
+      // Group by company
+      const runJobs = await db.select({ job: schema.jobs, company: schema.companies }).from(schema.jobObservations)
+        .innerJoin(schema.jobs, eq(schema.jobObservations.jobId, schema.jobs.id))
+        .leftJoin(schema.companies, eq(schema.jobs.companyId, schema.companies.id))
+        .where(eq(schema.jobObservations.runId, runId));
+
+      const companyGroups = new Map<string, typeof runJobs>();
+      for (const row of runJobs) {
+        if (row.company) {
+          const cid = row.company.id;
+          if (!companyGroups.has(cid)) companyGroups.set(cid, []);
+          companyGroups.get(cid)!.push(row);
+        }
+      }
+
+      for (const [companyId, rows] of companyGroups.entries()) {
+        await checkPauseOrCancel();
+        const firstRow = rows[0];
+        if (!firstRow) continue;
+        const company = firstRow.company!;
+        const jobsForCompany = rows.map(r => r.job);
+
+        const foundationEvidenceByJob: Record<string, any[]> = {};
+        const foundationSignalsByJob: Record<string, any[]> = {};
+        const competitionResultsByJob: Record<string, any> = {};
+
+        for (const job of jobsForCompany) {
+          // get signals
+          const sigs = await db.select().from(schema.observableSignals).where(eq(schema.observableSignals.jobId, job.id));
+          foundationSignalsByJob[job.id] = sigs.map(s => ({ type: s.signalType, value: s.observedValue }));
+
+          // get comp
+          const comp = await db.select().from(schema.competitionResults).where(eq(schema.competitionResults.jobId, job.id)).limit(1);
+          if (comp[0]) competitionResultsByJob[job.id] = comp[0];
+        }
+
+        const context = {
+          company,
+          jobsForCompany,
+          runId,
+          foundationEvidenceByJob,
+          foundationSignalsByJob,
+          competitionResultsByJob
+        };
+
+        try {
+          const oppResult = await runCompanyOpportunityIntelligence(context);
+          await persistCompanyOpportunityIntelligence(oppResult);
+          await emitEvent({
+            runId,
+            type: 'COMPANY_OPPORTUNITY_COMPLETED',
+            stage: 'COMPANY_OPPORTUNITY',
+            entityType: 'COMPANY',
+            entityId: company.id,
+            message: `Company opportunity evaluated for ${company.displayName}: ${oppResult.result.level}`
+          });
+        } catch (err: any) {
+          if (err.message === 'Mission Cancelled' || err.name === 'AbortError') throw err;
+          await emitEvent({
+            runId,
+            type: 'COMPANY_OPPORTUNITY_FAILED',
+            stage: 'COMPANY_OPPORTUNITY',
+            entityType: 'COMPANY',
+            entityId: company.id,
+            message: `Company opportunity failed: ${err.message}`
+          });
+        }
+      }
+
+      await db.update(schema.runs).set({ lastCheckpoint: 'COMPANY_OPPORTUNITY_COMPLETED' }).where(eq(schema.runs.id, runId));
     }
 
     await checkPauseOrCancel();
