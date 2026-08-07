@@ -8,6 +8,8 @@ import { competitionRegistry } from './competition/registry.js';
 import { registerDefaultProviders as registerCompetitionProviders } from './competition/providers/signals.js';
 import { companyOpportunityRegistry } from './company-opportunity/registry.js';
 import { registerDefaultProviders as registerCompanyOpportunityProviders } from './company-opportunity/providers/signals.js';
+import { discoveryIntelligenceRegistry } from './discovery-intelligence/registry.js';
+import { registerDefaultProviders as registerDiscoveryIntelligenceProviders } from './discovery-intelligence/providers/signals.js';
 
 let bootstrapped = false;
 
@@ -35,6 +37,9 @@ export function bootstrap() {
 
   // 4c. Company Opportunity Intelligence
   registerCompanyOpportunityProviders(companyOpportunityRegistry);
+
+  // 4d. Discovery Intelligence
+  registerDiscoveryIntelligenceProviders(discoveryIntelligenceRegistry);
 
   // 5. Decision Strategies (WHAT we recommend)
   registerCoreDecisionStrategies();

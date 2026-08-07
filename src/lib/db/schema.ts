@@ -546,3 +546,39 @@ export const companyOutlook = sqliteTable('company_outlook', {
   momentum: integer('momentum').notNull(), // 0-100
   createdAt: text('created_at').notNull()
 });
+
+export const oppDiscoveryResults = sqliteTable('opp_discovery_results', {
+  id: text('id').primaryKey(),
+  runId: text('run_id').references(() => runs.id),
+  jobId: text('job_id').notNull().references(() => jobs.id),
+  score: integer('score').notNull(), // 0-100
+  level: text('level').notNull(), // Exceptional, Excellent, Strong, Standard, Weak
+  confidence: integer('confidence').notNull(),
+  createdAt: text('created_at').notNull()
+});
+
+export const oppDiscoverySignals = sqliteTable('opp_discovery_signals', {
+  id: text('id').primaryKey(),
+  runId: text('run_id').references(() => runs.id),
+  jobId: text('job_id').notNull().references(() => jobs.id),
+  signalType: text('signal_type').notNull(),
+  value: text('value'),
+  weight: integer('weight').notNull(),
+  metadata: text('metadata', { mode: 'json' }),
+  createdAt: text('created_at').notNull()
+});
+
+export const oppDiscoverySummary = sqliteTable('opp_discovery_summary', {
+  id: text('id').primaryKey(),
+  runId: text('run_id').references(() => runs.id),
+  jobId: text('job_id').notNull().references(() => jobs.id),
+  quality: text('quality').notNull(),
+  source: text('source').notNull(),
+  visibility: text('visibility').notNull(),
+  uniqueness: text('uniqueness').notNull(),
+  competition: text('competition').notNull(),
+  authenticity: text('authenticity').notNull(),
+  evidenceCount: integer('evidence_count').notNull(),
+  confidence: integer('confidence').notNull(),
+  createdAt: text('created_at').notNull()
+});

@@ -8,6 +8,8 @@ import { getCompanyIntelligence } from '../company/engine';
 import { runIntelligenceFoundation, persistIntelligenceFoundation } from '../intelligence-foundation/index.js';
 import { runCompetitionIntelligence, persistCompetitionIntelligence } from '../competition/index.js';
 import { runCompanyOpportunityIntelligence, persistCompanyOpportunityIntelligence } from '../company-opportunity/index.js';
+import { runDiscoveryIntelligence, persistDiscoveryIntelligence } from '../discovery-intelligence/index.js';
+import type { DiscoveryIntelligenceContext } from '../discovery-intelligence/interfaces.js';
 import { CandidateProfileSchema, type CandidateProfile } from '../qualification/schema';
 import crypto from 'crypto';
 
@@ -52,13 +54,14 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
     
     // Determine start stage based on checkpoint
     const lastCp = run.lastCheckpoint;
-    const skipPreflight = ['PREFLIGHT_COMPLETED', 'DISCOVERY_COMPLETED', 'QUALIFICATION_COMPLETED', 'COMPANY_RESEARCH_COMPLETED', 'FOUNDATION_COMPLETED', 'COMPETITION_COMPLETED', 'COMPANY_OPPORTUNITY_COMPLETED'].includes(lastCp || '');
-    const skipDiscovery = ['DISCOVERY_COMPLETED', 'QUALIFICATION_COMPLETED', 'COMPANY_RESEARCH_COMPLETED', 'FOUNDATION_COMPLETED', 'COMPETITION_COMPLETED', 'COMPANY_OPPORTUNITY_COMPLETED'].includes(lastCp || '');
-    const skipQualification = ['QUALIFICATION_COMPLETED', 'COMPANY_RESEARCH_COMPLETED', 'FOUNDATION_COMPLETED', 'COMPETITION_COMPLETED', 'COMPANY_OPPORTUNITY_COMPLETED'].includes(lastCp || '');
-    const skipCompanyResearch = ['COMPANY_RESEARCH_COMPLETED', 'FOUNDATION_COMPLETED', 'COMPETITION_COMPLETED', 'COMPANY_OPPORTUNITY_COMPLETED'].includes(lastCp || '');
-    const skipFoundation = ['FOUNDATION_COMPLETED', 'COMPETITION_COMPLETED', 'COMPANY_OPPORTUNITY_COMPLETED'].includes(lastCp || '');
-    const skipCompetition = ['COMPETITION_COMPLETED', 'COMPANY_OPPORTUNITY_COMPLETED'].includes(lastCp || '');
-    const skipCompanyOpportunity = ['COMPANY_OPPORTUNITY_COMPLETED'].includes(lastCp || '');
+    const skipPreflight = ['PREFLIGHT_COMPLETED', 'DISCOVERY_COMPLETED', 'QUALIFICATION_COMPLETED', 'COMPANY_RESEARCH_COMPLETED', 'FOUNDATION_COMPLETED', 'COMPETITION_COMPLETED', 'COMPANY_OPPORTUNITY_COMPLETED', 'DISCOVERY_INTELLIGENCE_COMPLETED'].includes(lastCp || '');
+    const skipDiscovery = ['DISCOVERY_COMPLETED', 'QUALIFICATION_COMPLETED', 'COMPANY_RESEARCH_COMPLETED', 'FOUNDATION_COMPLETED', 'COMPETITION_COMPLETED', 'COMPANY_OPPORTUNITY_COMPLETED', 'DISCOVERY_INTELLIGENCE_COMPLETED'].includes(lastCp || '');
+    const skipQualification = ['QUALIFICATION_COMPLETED', 'COMPANY_RESEARCH_COMPLETED', 'FOUNDATION_COMPLETED', 'COMPETITION_COMPLETED', 'COMPANY_OPPORTUNITY_COMPLETED', 'DISCOVERY_INTELLIGENCE_COMPLETED'].includes(lastCp || '');
+    const skipCompanyResearch = ['COMPANY_RESEARCH_COMPLETED', 'FOUNDATION_COMPLETED', 'COMPETITION_COMPLETED', 'COMPANY_OPPORTUNITY_COMPLETED', 'DISCOVERY_INTELLIGENCE_COMPLETED'].includes(lastCp || '');
+    const skipFoundation = ['FOUNDATION_COMPLETED', 'COMPETITION_COMPLETED', 'COMPANY_OPPORTUNITY_COMPLETED', 'DISCOVERY_INTELLIGENCE_COMPLETED'].includes(lastCp || '');
+    const skipCompetition = ['COMPETITION_COMPLETED', 'COMPANY_OPPORTUNITY_COMPLETED', 'DISCOVERY_INTELLIGENCE_COMPLETED'].includes(lastCp || '');
+    const skipCompanyOpportunity = ['COMPANY_OPPORTUNITY_COMPLETED', 'DISCOVERY_INTELLIGENCE_COMPLETED'].includes(lastCp || '');
+    const skipDiscoveryIntelligence = ['DISCOVERY_INTELLIGENCE_COMPLETED'].includes(lastCp || '');
 
     if (lastCp) {
       await emitEvent({ runId, type: 'RUN_RESUMED_FROM_CHECKPOINT', stage: 'START', message: `Resuming run from checkpoint: ${lastCp}` });
@@ -586,6 +589,87 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
       }
 
       await db.update(schema.runs).set({ lastCheckpoint: 'COMPANY_OPPORTUNITY_COMPLETED' }).where(eq(schema.runs.id, runId));
+    }
+
+    await checkPauseOrCancel();
+
+    // DISCOVERY INTELLIGENCE
+    if (!skipDiscoveryIntelligence) {
+      await updateState('RUNNING', 'DISCOVERY_INTELLIGENCE');
+      await emitEvent({ runId, type: 'DISCOVERY_INTELLIGENCE_STARTED', stage: 'DISCOVERY_INTELLIGENCE' });
+
+      // Load all job observations for this run
+      const runJobs = await db.select({ 
+        job: schema.jobs, 
+        company: schema.companies, 
+        observation: schema.jobObservations,
+        source: schema.jobSources
+      }).from(schema.jobObservations)
+        .innerJoin(schema.jobs, eq(schema.jobObservations.jobId, schema.jobs.id))
+        .leftJoin(schema.companies, eq(schema.jobs.companyId, schema.companies.id))
+        .leftJoin(schema.jobSources, eq(schema.jobs.id, schema.jobSources.jobId))
+        .where(eq(schema.jobObservations.runId, runId));
+
+      const similarJobsInRun = runJobs.map(r => r.job);
+
+      for (const row of runJobs) {
+        await checkPauseOrCancel();
+        const { job, company, observation, source } = row;
+
+        // get signals
+        const sigs = await db.select().from(schema.observableSignals).where(eq(schema.observableSignals.jobId, job.id));
+        const foundationSignals = sigs.map(s => ({ type: s.signalType, value: s.observedValue }));
+
+        // get comp
+        const comp = await db.select().from(schema.competitionResults).where(eq(schema.competitionResults.jobId, job.id)).limit(1);
+        const competitionResult = comp[0] ? comp[0] : undefined;
+        
+        // get company opp
+        let companyOpportunityResult = undefined;
+        if (company) {
+          const compOpp = await db.select().from(schema.companyOpportunity).where(eq(schema.companyOpportunity.companyId, company.id)).limit(1);
+          if (compOpp[0]) companyOpportunityResult = compOpp[0];
+        }
+
+        const context: DiscoveryIntelligenceContext = {
+          job,
+          runId,
+          observation,
+          foundationEvidence: [], // omitting raw evidence for brevity in discovery intel
+          foundationSignals,
+          similarJobsInRun
+        };
+        
+        if (company) context.company = company;
+        if (source) context.source = source;
+        if (competitionResult) context.competitionResult = competitionResult as any;
+        if (companyOpportunityResult) context.companyOpportunityResult = companyOpportunityResult as any;
+
+        try {
+          const discResult = await runDiscoveryIntelligence(context);
+          await persistDiscoveryIntelligence(discResult);
+          await emitEvent({
+            runId,
+            type: 'DISCOVERY_INTELLIGENCE_COMPLETED',
+            stage: 'DISCOVERY_INTELLIGENCE',
+            entityType: 'JOB',
+            entityId: job.id,
+            message: `Discovery intelligence evaluated: ${discResult.result.level}`
+          });
+        } catch (err: any) {
+          if (err.message === 'Mission Cancelled' || err.name === 'AbortError') throw err;
+          await emitEvent({
+            runId,
+            type: 'DISCOVERY_INTELLIGENCE_FAILED',
+            stage: 'DISCOVERY_INTELLIGENCE',
+            entityType: 'JOB',
+            entityId: job.id,
+            message: `Discovery intelligence failed: ${err.message}`
+          });
+        }
+      }
+
+      await db.update(schema.runs).set({ lastCheckpoint: 'DISCOVERY_INTELLIGENCE_COMPLETED' }).where(eq(schema.runs.id, runId));
     }
 
     await checkPauseOrCancel();
