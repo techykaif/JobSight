@@ -418,3 +418,85 @@ export const strategyStatistics = sqliteTable('strategy_statistics', {
   avgBudgetUsed: integer('avg_budget_used'),
   ...timestampFields
 });
+
+export const observableSignals = sqliteTable('observable_signals', {
+  id: text('id').primaryKey(),
+  runId: text('run_id').references(() => runs.id),
+  jobId: text('job_id').notNull().references(() => jobs.id),
+  signalType: text('signal_type').notNull(),
+  observedValue: text('observed_value'),
+  metadata: text('metadata', { mode: 'json' }),
+  createdAt: text('created_at').notNull()
+});
+
+export const opportunityEvidence = sqliteTable('opportunity_evidence', {
+  id: text('id').primaryKey(),
+  runId: text('run_id').references(() => runs.id),
+  jobId: text('job_id').notNull().references(() => jobs.id),
+  category: text('category').notNull(), // e.g. SALARY, REMOTE, COMPANY
+  confidence: integer('confidence'),
+  createdAt: text('created_at').notNull()
+});
+
+export const evidenceItems = sqliteTable('evidence_items', {
+  id: text('id').primaryKey(),
+  opportunityEvidenceId: text('opportunity_evidence_id').notNull().references(() => opportunityEvidence.id),
+  category: text('category').notNull(),
+  title: text('title').notNull(),
+  description: text('description'),
+  observedValue: text('observed_value'),
+  normalizedValue: text('normalized_value'),
+  weight: integer('weight'),
+  confidence: integer('confidence'),
+  source: text('source'),
+  timestamp: text('timestamp').notNull(),
+  metadata: text('metadata', { mode: 'json' })
+});
+
+export const confidenceResults = sqliteTable('confidence_results', {
+  id: text('id').primaryKey(),
+  runId: text('run_id').references(() => runs.id),
+  jobId: text('job_id').notNull().references(() => jobs.id),
+  confidenceScore: integer('confidence_score').notNull(),
+  factors: text('factors', { mode: 'json' }), // which fields were missing/unknown etc
+  createdAt: text('created_at').notNull()
+});
+
+export const evidenceSummary = sqliteTable('evidence_summary', {
+  id: text('id').primaryKey(),
+  runId: text('run_id').references(() => runs.id),
+  jobId: text('job_id').notNull().references(() => jobs.id),
+  opportunityScore: integer('opportunity_score'),
+  confidence: integer('confidence'),
+  evidenceChecklist: text('evidence_checklist', { mode: 'json' }), // string[]
+  createdAt: text('created_at').notNull()
+});
+
+export const competitionResults = sqliteTable('competition_results', {
+  id: text('id').primaryKey(),
+  runId: text('run_id').references(() => runs.id),
+  jobId: text('job_id').notNull().references(() => jobs.id),
+  score: integer('score').notNull(), // 0-100
+  level: text('level').notNull(), // Very Low, Low, Medium, High, Very High
+  confidence: integer('confidence').notNull(),
+  createdAt: text('created_at').notNull()
+});
+
+export const competitionSignals = sqliteTable('competition_signals', {
+  id: text('id').primaryKey(),
+  runId: text('run_id').references(() => runs.id),
+  jobId: text('job_id').notNull().references(() => jobs.id),
+  signalType: text('signal_type').notNull(),
+  value: text('value'),
+  weight: integer('weight').notNull(),
+  metadata: text('metadata', { mode: 'json' }),
+  createdAt: text('created_at').notNull()
+});
+
+export const competitionSummary = sqliteTable('competition_summary', {
+  id: text('id').primaryKey(),
+  runId: text('run_id').references(() => runs.id),
+  jobId: text('job_id').notNull().references(() => jobs.id),
+  reasons: text('reasons', { mode: 'json' }), // string[] of '✓ Official Careers Page' etc.
+  createdAt: text('created_at').notNull()
+});

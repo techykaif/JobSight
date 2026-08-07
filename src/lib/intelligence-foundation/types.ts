@@ -1,0 +1,31 @@
+export type SignalCategory = 'SALARY' | 'REMOTE' | 'COMPANY' | 'REQUIREMENTS' | 'APPLICATION' | 'COMPETITION' | 'DISCOVERY' | 'UNKNOWN';
+
+export type SignalType = 
+  | 'SALARY_MIN'
+  | 'SALARY_MAX'
+  | 'SALARY_CURRENCY'
+  | 'SALARY_TRANSPARENCY'
+  | 'REMOTE_POLICY'
+  | 'EXPERIENCE_MATCH'
+  | 'TECHNOLOGY_MATCH'
+  | 'EMPLOYMENT_TYPE'
+  | 'LOCATION_MATCH'
+  | 'OFFICIAL_ATS'
+  | 'DIRECT_CAREERS_PAGE'
+  | 'DISCOVERY_SOURCE'
+  | 'POSTING_FRESHNESS'
+  | 'COMPANY_AUTHENTICITY'
+  | 'HIRING_MOMENTUM'
+  | 'BENEFITS'
+  | 'APPLICATION_SIMPLICITY'
+  | 'COMPETITION_SIGNALS'
+  | 'COMPANY_GROWTH'
+  | 'WORK_AUTHORIZATION'
+  | 'MISSING_INFORMATION'
+  | 'UNKNOWN_INFORMATION';
+
+export interface SignalMetadata {
+  source?: string;
+  timestamp?: string;
+  [key: string]: any;
+}
