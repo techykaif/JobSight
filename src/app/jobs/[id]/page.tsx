@@ -122,37 +122,37 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   const title = job.canonicalTitle || job.normalizedTitle || 'Unknown Role';
 
   return (
-    <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '2rem' }}>
+    <div style={{ maxWidth: 1400, margin: '0 auto', animation: 'fadeIn 0.35s ease-out' }}>
       
       <Breadcrumbs items={[
-        { label: 'Dashboard', href: '/' },
+        { label: 'Home', href: '/' },
         { label: 'Jobs', href: '/jobs' },
-        { label: title, href: `/jobs/${job.id}` }
+        { label: title }
       ]} />
       
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2.5rem', marginTop: '1rem' }}>
-        <div>
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '0.5rem' }}>
-            <h1 style={{ margin: 0, fontSize: '2.2rem', fontWeight: 700, lineHeight: 1.2 }}>{title}</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 32, marginTop: 20, gap: 16 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+            <h1 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.2 }}>{title}</h1>
             <Link href={`/jobs?decision=${decisionVal}`} style={{ textDecoration: 'none' }}>
               <StatusBadge status={formatDecisionText(decisionVal)} variant={decisionVal === 'APPLY' ? 'success' : decisionVal === 'SKIP' ? 'danger' : 'neutral'} />
             </Link>
           </div>
-          <p style={{ margin: 0, fontSize: '1.1rem', color: 'var(--text-secondary)', display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-            at {job.companyId ? <Link href={`/jobs?company=${companyName}`} style={{ color: 'var(--accent-color)', textDecoration: 'none' }}>{companyName}</Link> : companyName} 
-            &nbsp;&bull;&nbsp; {job.location || 'Unknown Location'} 
-            {job.remoteType && (
-              <>&nbsp;&bull;&nbsp; <Link href={`/jobs?remote=${job.remoteType}`} style={{ textDecoration: 'none' }}><StatusBadge status={job.remoteType} variant="info" /></Link></>
-            )}
+          <p style={{ margin: 0, fontSize: '0.9375rem', color: 'var(--text-secondary)', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            {job.companyId
+              ? <Link href={`/jobs?company=${companyName}`} style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}>{companyName}</Link>
+              : companyName}
+            {job.location && <><span style={{ opacity: 0.4 }}>·</span>{job.location}</>}
+            {job.remoteType && <><span style={{ opacity: 0.4 }}>·</span><Link href={`/jobs?remote=${job.remoteType}`} style={{ textDecoration: 'none' }}><StatusBadge status={job.remoteType} variant="info" /></Link></>}
           </p>
         </div>
-        <Link href="/jobs" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.2rem', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-color)', textDecoration: 'none', fontWeight: 500, transition: 'all 0.2s' }}>
-          &larr; Back
+        <Link href="/jobs" className="btn" style={{ flexShrink: 0 }}>
+          ← Back to Jobs
         </Link>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem', '@media (min-width: 1024px)': { gridTemplateColumns: '2fr 1fr' } } as any}>
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 24, alignItems: 'start' }}>
         
         {/* LEFT COLUMN */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>

@@ -1,22 +1,25 @@
 import { db } from '@/lib/db/client';
 import * as schema from '@/lib/db/schema';
-import { desc, eq, sql, or, like, and } from 'drizzle-orm';
+import { desc, eq, sql, or, like } from 'drizzle-orm';
 import styles from './radar.module.css';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { JobCard } from '@/components/ui/JobCard';
-import { SectionHeader } from '@/components/ui/SectionHeader';
+import type { Metadata } from 'next';
 
-// Helper component for Empty State
-const EmptyState = ({ message, icon }: { message: string, icon: string }) => (
+export const metadata: Metadata = {
+  title: 'Discovery Radar — JobSight',
+  description: 'Real-time intelligence — hidden gems, highest compensation, fast-hiring companies, and global remote opportunities.',
+};
+
+// Inline empty state for radar sections
+const EmptyState = ({ message, icon }: { message: string; icon: string }) => (
   <div className={styles.emptyState}>
     <div className={styles.emptyIcon}>{icon}</div>
-    <p>{message}</p>
+    <p className={styles.emptyText}>{message}</p>
   </div>
 );
 
 export default async function DiscoveryRadarPage() {
-  // Fetch data for each section
-  
   // 1. Hidden Gems
   const hiddenGems = await db
     .select({
@@ -42,7 +45,6 @@ export default async function DiscoveryRadarPage() {
       id: schema.jobs.id,
       canonicalTitle: schema.jobs.canonicalTitle,
       normalizedTitle: schema.jobs.normalizedTitle,
-      location: schema.jobs.location,
       salaryMin: schema.jobs.salaryMin,
       salaryMax: schema.jobs.salaryMax,
       salaryCurrency: schema.jobs.salaryCurrency,
@@ -60,13 +62,11 @@ export default async function DiscoveryRadarPage() {
       id: schema.jobs.id,
       canonicalTitle: schema.jobs.canonicalTitle,
       normalizedTitle: schema.jobs.normalizedTitle,
-      location: schema.jobs.location,
       salaryMin: schema.jobs.salaryMin,
       salaryMax: schema.jobs.salaryMax,
       salaryCurrency: schema.jobs.salaryCurrency,
       remoteType: schema.jobs.remoteType,
       companyName: schema.companies.displayName,
-      growthSignal: schema.companyAnalysis.growthSignal,
     })
     .from(schema.jobs)
     .innerJoin(schema.companyAnalysis, eq(schema.jobs.companyId, schema.companyAnalysis.companyId))
@@ -80,7 +80,6 @@ export default async function DiscoveryRadarPage() {
       id: schema.jobs.id,
       canonicalTitle: schema.jobs.canonicalTitle,
       normalizedTitle: schema.jobs.normalizedTitle,
-      location: schema.jobs.location,
       salaryMin: schema.jobs.salaryMin,
       salaryMax: schema.jobs.salaryMax,
       salaryCurrency: schema.jobs.salaryCurrency,
@@ -98,7 +97,6 @@ export default async function DiscoveryRadarPage() {
       id: schema.jobs.id,
       canonicalTitle: schema.jobs.canonicalTitle,
       normalizedTitle: schema.jobs.normalizedTitle,
-      location: schema.jobs.location,
       salaryMin: schema.jobs.salaryMin,
       salaryMax: schema.jobs.salaryMax,
       salaryCurrency: schema.jobs.salaryCurrency,
@@ -116,7 +114,6 @@ export default async function DiscoveryRadarPage() {
       id: schema.jobs.id,
       canonicalTitle: schema.jobs.canonicalTitle,
       normalizedTitle: schema.jobs.normalizedTitle,
-      location: schema.jobs.location,
       salaryMin: schema.jobs.salaryMin,
       salaryMax: schema.jobs.salaryMax,
       salaryCurrency: schema.jobs.salaryCurrency,
@@ -134,7 +131,6 @@ export default async function DiscoveryRadarPage() {
       id: schema.jobs.id,
       canonicalTitle: schema.jobs.canonicalTitle,
       normalizedTitle: schema.jobs.normalizedTitle,
-      location: schema.jobs.location,
       salaryMin: schema.jobs.salaryMin,
       salaryMax: schema.jobs.salaryMax,
       salaryCurrency: schema.jobs.salaryCurrency,
@@ -153,7 +149,6 @@ export default async function DiscoveryRadarPage() {
       id: schema.jobs.id,
       canonicalTitle: schema.jobs.canonicalTitle,
       normalizedTitle: schema.jobs.normalizedTitle,
-      location: schema.jobs.location,
       salaryMin: schema.jobs.salaryMin,
       salaryMax: schema.jobs.salaryMax,
       salaryCurrency: schema.jobs.salaryCurrency,
@@ -168,45 +163,61 @@ export default async function DiscoveryRadarPage() {
     .limit(6);
 
   const sections = [
-    { title: "🔥 Hidden Gems", data: hiddenGems, emptyMsg: "No hidden gems found yet. The AI is still searching the depths.", icon: "💎", highlightKey: null },
-    { title: "💰 Highest Compensation", data: highestComp, emptyMsg: "Awaiting salary data to highlight the best paying roles.", icon: "💸", highlightKey: null },
-    { title: "🚀 Fast Growing Companies", data: fastGrowing, emptyMsg: "No hyper-growth companies identified yet.", icon: "📈", highlightKey: "Growth Signal: HIGH" },
-    { title: "🌍 Global Remote", data: globalRemote, emptyMsg: "Remote opportunities are currently scarce.", icon: "🌎", highlightKey: "Remote" },
-    { title: "🇮🇳 India", data: indiaJobs, emptyMsg: "No opportunities found in India at the moment.", icon: "🇮🇳", highlightKey: null },
-    { title: "🧠 AI Companies", data: aiJobs, emptyMsg: "No AI roles found right now.", icon: "🤖", highlightKey: "AI/ML" },
-    { title: "⚡ Fast Hiring", data: fastHiring, emptyMsg: "No fast-hiring signals detected yet.", icon: "🏎️", highlightKey: "Hiring Fast" },
-    { title: "⭐ Highest Opportunity", data: highestOpportunity, emptyMsg: "Opportunity scores are currently being calculated.", icon: "🎯", highlightKey: null }
+    { title: 'Hidden Gems', emoji: '💎', data: hiddenGems, emptyMsg: 'The AI is still scanning the depths for hidden opportunities.', emptyIcon: '🔭' },
+    { title: 'Highest Compensation', emoji: '💰', data: highestComp, emptyMsg: 'Awaiting salary data to surface the best-paying roles.', emptyIcon: '💸' },
+    { title: 'Fast Growing Companies', emoji: '📈', data: fastGrowing, emptyMsg: 'No hyper-growth signals detected yet.', emptyIcon: '🚀' },
+    { title: 'Global Remote', emoji: '🌍', data: globalRemote, emptyMsg: 'No global remote opportunities found right now.', emptyIcon: '🌐' },
+    { title: 'India', emoji: '🇮🇳', data: indiaJobs, emptyMsg: 'No India opportunities found at the moment.', emptyIcon: '📍' },
+    { title: 'AI & Machine Learning', emoji: '🧠', data: aiJobs, emptyMsg: 'No AI/ML roles found right now.', emptyIcon: '🤖' },
+    { title: 'Fast Hiring', emoji: '⚡', data: fastHiring, emptyMsg: 'No fast-hiring signals detected yet.', emptyIcon: '🏎️' },
+    { title: 'Highest Opportunity Score', emoji: '⭐', data: highestOpportunity, emptyMsg: 'Opportunity scores are being calculated.', emptyIcon: '🎯' },
   ];
+
+  const totalOpportunities = sections.reduce((sum, s) => sum + s.data.length, 0);
 
   return (
     <div className={styles.container}>
-      <header className={styles.header}>
-        <Breadcrumbs items={[{ label: 'Dashboard', href: '/' }, { label: 'Discovery Radar' }]} />
-        <h1 className={styles.title}>Discovery Radar</h1>
-        <p className={styles.subtitle}>Real-time intelligence on the best opportunities tailored for you.</p>
-      </header>
+      {/* Header */}
+      <div className={styles.header}>
+        <Breadcrumbs items={[{ label: 'Home', href: '/' }, { label: 'Discovery Radar' }]} />
+        <div style={{ marginTop: 16 }}>
+          <h1 className={styles.title}>Discovery Radar</h1>
+          <p className={styles.subtitle}>
+            {totalOpportunities} opportunities surfaced across {sections.filter(s => s.data.length > 0).length} intelligence categories
+          </p>
+        </div>
+      </div>
 
+      {/* Sections */}
       {sections.map((section, idx) => (
-        <section key={idx} className={styles.section}>
-          <SectionHeader title={section.title} />
-          
+        <section key={idx} className={styles.section} aria-label={section.title}>
+          {/* Section header */}
+          <div className={styles.sectionHeaderRow}>
+            <h2 className={styles.sectionTitle}>
+              <span aria-hidden="true">{section.emoji}</span>
+              {section.title}
+            </h2>
+            <div className={styles.sectionDivider} />
+            <span className={styles.sectionCount}>{section.data.length}</span>
+          </div>
+
           {section.data.length > 0 ? (
             <div className={styles.grid}>
-              {section.data.map((job) => (
-                <JobCard 
-                  key={job.id} 
+              {section.data.map(job => (
+                <JobCard
+                  key={job.id}
                   id={job.id}
                   title={job.canonicalTitle || job.normalizedTitle || 'Unknown Role'}
                   company={job.companyName || 'Unknown Company'}
                   salaryMin={job.salaryMin ?? undefined}
                   salaryMax={job.salaryMax ?? undefined}
-                  remote={!!job.remoteType}
-                  provider={section.highlightKey ? section.highlightKey : undefined}
+                  remote={job.remoteType === 'REMOTE' || job.remoteType === 'FULLY_REMOTE'}
+                  score={(job as any).opportunityScore ?? undefined}
                 />
               ))}
             </div>
           ) : (
-            <EmptyState message={section.emptyMsg} icon={section.icon} />
+            <EmptyState message={section.emptyMsg} icon={section.emptyIcon} />
           )}
         </section>
       ))}

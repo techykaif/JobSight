@@ -2,10 +2,52 @@
 import React from 'react';
 
 export interface ActionButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
   size?: 'small' | 'medium' | 'large';
   icon?: React.ReactNode;
 }
+
+const SIZE_STYLES: Record<string, React.CSSProperties> = {
+  small:  { padding: '5px 10px', fontSize: '0.8125rem', gap: '5px' },
+  medium: { padding: '7px 14px', fontSize: '0.875rem',  gap: '6px' },
+  large:  { padding: '10px 20px', fontSize: '1rem',     gap: '8px' },
+};
+
+const VARIANT_STYLES: Record<string, React.CSSProperties> = {
+  primary: {
+    background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+    color: '#fff',
+    borderColor: 'rgba(59,130,246,0.6)',
+  },
+  secondary: {
+    backgroundColor: 'var(--bg-subtle)',
+    color: 'var(--text-primary)',
+    borderColor: 'var(--border-default)',
+  },
+  outline: {
+    backgroundColor: 'transparent',
+    color: 'var(--text-secondary)',
+    borderColor: 'var(--border-default)',
+  },
+  ghost: {
+    backgroundColor: 'transparent',
+    color: 'var(--text-muted)',
+    borderColor: 'transparent',
+  },
+  danger: {
+    backgroundColor: 'var(--danger-bg)',
+    color: 'var(--danger-text)',
+    borderColor: 'var(--danger-border)',
+  },
+};
+
+const HOVER_STYLES: Record<string, Partial<React.CSSProperties>> = {
+  primary: { opacity: '0.9' as any },
+  secondary: { backgroundColor: 'var(--bg-hover)', borderColor: 'var(--border-strong)' },
+  outline: { backgroundColor: 'var(--bg-subtle)', color: 'var(--text-primary)', borderColor: 'var(--border-default)' },
+  ghost: { backgroundColor: 'var(--bg-hover)', color: 'var(--text-secondary)' },
+  danger: { backgroundColor: 'rgba(239,68,68,0.18)' },
+};
 
 export const ActionButton: React.FC<ActionButtonProps> = ({
   children,
@@ -13,85 +55,52 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
   size = 'medium',
   icon,
   className = '',
+  style,
   ...props
 }) => {
-  const getStyles = (): React.CSSProperties => {
-    const base: React.CSSProperties = {
-      display: 'inline-flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: '8px',
-      borderRadius: '8px',
-      fontWeight: 600,
-      cursor: 'pointer',
-      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-      border: '1px solid transparent',
-      outline: 'none',
-    };
-
-    switch (size) {
-      case 'small':
-        base.padding = '6px 12px';
-        base.fontSize = '0.875rem';
-        break;
-      case 'large':
-        base.padding = '12px 24px';
-        base.fontSize = '1.125rem';
-        break;
-      case 'medium':
-      default:
-        base.padding = '8px 16px';
-        base.fontSize = '1rem';
-        break;
-    }
-
-    switch (variant) {
-      case 'secondary':
-        base.backgroundColor = 'var(--text-main)';
-        base.color = '#fff';
-        break;
-      case 'outline':
-        base.backgroundColor = 'transparent';
-        base.borderColor = 'var(--border-subtle)';
-        base.color = 'var(--text-main)';
-        break;
-      case 'ghost':
-        base.backgroundColor = 'transparent';
-        base.color = 'var(--primary)';
-        break;
-      case 'primary':
-      default:
-        base.backgroundColor = 'var(--primary)';
-        base.color = '#fff';
-        break;
-    }
-
-    return base;
+  const baseStyle: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 'var(--radius-md)',
+    fontFamily: 'var(--font-sans)',
+    fontWeight: 500,
+    cursor: 'pointer',
+    transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
+    border: '1px solid transparent',
+    outline: 'none',
+    whiteSpace: 'nowrap',
+    lineHeight: 1.4,
+    userSelect: 'none',
+    letterSpacing: '0.01em',
+    ...SIZE_STYLES[size],
+    ...VARIANT_STYLES[variant],
+    ...style,
   };
 
   return (
     <button
       className={className}
-      style={getStyles()}
-      onMouseOver={(e) => {
-        if (variant === 'outline' || variant === 'ghost') {
-          e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.05)';
-        } else {
-          e.currentTarget.style.opacity = '0.9';
-        }
+      style={baseStyle}
+      onMouseOver={e => {
+        const h = HOVER_STYLES[variant];
+        if (h) Object.assign(e.currentTarget.style, h);
       }}
-      onMouseOut={(e) => {
-        if (variant === 'outline' || variant === 'ghost') {
-          e.currentTarget.style.backgroundColor = 'transparent';
-        } else {
-          e.currentTarget.style.opacity = '1';
-        }
+      onMouseOut={e => {
+        // reset to base
+        Object.assign(e.currentTarget.style, VARIANT_STYLES[variant]);
       }}
-      onFocus={(e) => {
-        e.currentTarget.style.boxShadow = `0 0 0 3px rgba(59, 130, 246, 0.3)`;
+      onFocus={e => {
+        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.25)';
       }}
-      onBlur={(e) => {
+      onBlur={e => {
         e.currentTarget.style.boxShadow = 'none';
+      }}
+      onMouseDown={e => {
+        e.currentTarget.style.transform = 'scale(0.98)';
+      }}
+      onMouseUp={e => {
+        e.currentTarget.style.transform = 'scale(1)';
       }}
       {...props}
     >

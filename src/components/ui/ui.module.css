@@ -1,99 +1,168 @@
-/* Premium Aesthetics & Motion for JobSight */
+/* ============================================================
+   JobSight — UI Component Module
+   ============================================================ */
 
+/* ============================================================
+   CARD
+   ============================================================ */
 
-/* Card */
 .card {
   background: var(--bg-card);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-subtle);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition-base);
   overflow: hidden;
 }
 
-.padding-none { padding: 0; }
-.padding-small { padding: 12px; }
-.padding-medium { padding: 24px; }
-.padding-large { padding: 32px; }
+.padding-none   { padding: 0; }
+.padding-small  { padding: 12px; }
+.padding-medium { padding: 20px; }
+.padding-large  { padding: 28px; }
 
 .interactiveCard {
   cursor: pointer;
 }
+
 .interactiveCard:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 20px -3px rgba(0, 0, 0, 0.1);
-  border-color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-default);
 }
+
 .interactiveCard:focus-visible {
-  outline: 2px solid var(--primary);
+  outline: 2px solid var(--border-focus);
   outline-offset: 2px;
 }
 
-/* Badges */
+/* ============================================================
+   BADGES
+   ============================================================ */
+
 .badge {
   display: inline-flex;
   align-items: center;
-  padding: 4px 10px;
-  border-radius: 9999px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  line-height: 1;
+  gap: 3px;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1.4;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  transition: transform 0.2s;
-}
-.badge:hover {
-  transform: scale(1.05);
+  letter-spacing: 0.06em;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  transition: transform 0.15s ease;
 }
 
-.badge-success { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
-.badge-warning { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
-.badge-danger { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
-.badge-info { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.4); }
-.badge-neutral { background: rgba(139, 148, 158, 0.12); color: var(--text-secondary); border: 1px solid rgba(139, 148, 158, 0.3); }
+.badge:hover { transform: scale(1.03); }
 
-/* Metric Card */
+.badge-success {
+  background: var(--success-bg);
+  color: var(--success-text);
+  border-color: var(--success-border);
+}
+
+.badge-warning {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  border-color: var(--warning-border);
+}
+
+.badge-danger {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  border-color: var(--danger-border);
+}
+
+.badge-info {
+  background: var(--info-bg);
+  color: var(--info);
+  border-color: var(--info-border);
+}
+
+.badge-neutral {
+  background: rgba(139, 149, 168, 0.08);
+  color: var(--text-secondary);
+  border-color: rgba(139, 149, 168, 0.18);
+}
+
+/* ============================================================
+   METRIC CARD
+   ============================================================ */
+
 .metricCard {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
+  position: relative;
+  overflow: hidden;
 }
-.metricValue {
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--text-main);
-  line-height: 1.2;
+
+.metricCard::after {
+  content: '';
+  position: absolute;
+  top: 0; right: 0;
+  width: 64px;
+  height: 64px;
+  background: radial-gradient(circle, rgba(59,130,246,0.06) 0%, transparent 70%);
+  pointer-events: none;
 }
+
 .metricLabel {
-  font-size: 0.875rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
   color: var(--text-muted);
-  font-weight: 500;
 }
+
+.metricValue {
+  font-size: 1.875rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+  line-height: 1.15;
+}
+
 .metricTrend {
-  font-size: 0.875rem;
+  font-size: 0.75rem;
   font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
+  margin-top: 2px;
 }
-.trendUp { color: var(--success); }
-.trendDown { color: var(--danger); }
 
-/* Section Header */
+.trendUp   { color: var(--success-text); }
+.trendDown { color: var(--danger-text); }
+
+/* ============================================================
+   SECTION HEADER
+   ============================================================ */
+
 .sectionHeader {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
+  align-items: baseline;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-hairline);
 }
+
 .sectionTitle {
-  font-size: 1.5rem;
+  font-size: 1.0625rem;
   font-weight: 700;
-  color: var(--text-main);
+  color: var(--text-primary);
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: -0.01em;
 }
+
 .sectionDescription {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   color: var(--text-muted);
-  margin-top: 4px;
+  margin-top: 2px;
 }

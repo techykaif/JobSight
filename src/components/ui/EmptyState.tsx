@@ -18,15 +18,49 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
 }) => {
   return (
     <Card className={className} padding="large">
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '16px' }}>
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        textAlign: 'center',
+        gap: 16,
+        padding: '24px 0',
+      }}>
         {icon && (
-          <div style={{ color: 'var(--text-muted)', fontSize: '3rem', marginBottom: '8px' }} aria-hidden="true">
+          <div style={{
+            fontSize: '2.5rem',
+            opacity: 0.5,
+            lineHeight: 1,
+            marginBottom: 4,
+          }} aria-hidden="true">
             {icon}
           </div>
         )}
-        <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>{title}</h3>
-        <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', maxWidth: '400px', margin: 0 }}>{description}</p>
-        {action && <div style={{ marginTop: '8px' }}>{action}</div>}
+        <div>
+          <h3 style={{
+            fontSize: '1.0625rem',
+            fontWeight: 600,
+            color: 'var(--text-primary)',
+            margin: '0 0 8px',
+            letterSpacing: '-0.01em',
+          }}>
+            {title}
+          </h3>
+          <p style={{
+            fontSize: '0.875rem',
+            color: 'var(--text-muted)',
+            maxWidth: 400,
+            margin: '0 auto',
+            lineHeight: 1.6,
+          }}>
+            {description}
+          </p>
+        </div>
+        {action && (
+          <div style={{ marginTop: 8 }}>
+            {action}
+          </div>
+        )}
       </div>
     </Card>
   );
