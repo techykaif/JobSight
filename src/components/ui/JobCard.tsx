@@ -21,6 +21,14 @@ export interface JobCardProps {
   provider?: string | undefined;
   age?: string | undefined;
   decision?: string | undefined;
+  // ── Intelligence extensions (D1.4) ──────────────────────────────
+  /** Application readiness level from B5 applicationResults */
+  readiness?: string | undefined;
+  /** Company opportunity level from B3 companyOpportunity */
+  companyOpportunity?: string | undefined;
+  /** Decision confidence 0–100 from decisionResults */
+  confidence?: number | undefined;
+  // ────────────────────────────────────────────────────────────────
   onClick?: (() => void) | undefined;
   className?: string | undefined;
 }
@@ -48,6 +56,24 @@ const competitionVariant = (c: string): 'success' | 'warning' | 'danger' | 'neut
   return 'neutral';
 };
 
+// ── Readiness variant helpers ────────────────────────────────────────────────
+const readinessVariant = (r: string): 'success' | 'info' | 'warning' | 'danger' | 'neutral' => {
+  if (r === 'Ready Now') return 'success';
+  if (r === 'Almost Ready') return 'info';
+  if (r === 'Needs Improvement') return 'warning';
+  if (r === 'Not Recommended') return 'danger';
+  return 'neutral';
+};
+
+const companyOpportunityVariant = (l: string): 'success' | 'info' | 'warning' | 'danger' | 'neutral' => {
+  const lower = l.toLowerCase();
+  if (lower.includes('excellent') || lower.includes('strong')) return 'success';
+  if (lower.includes('good')) return 'info';
+  if (lower.includes('average')) return 'warning';
+  if (lower.includes('weak')) return 'danger';
+  return 'neutral';
+};
+
 export const JobCard: React.FC<JobCardProps> = ({
   id,
   title,
@@ -60,6 +86,9 @@ export const JobCard: React.FC<JobCardProps> = ({
   provider,
   age,
   decision,
+  readiness,
+  companyOpportunity,
+  confidence,
   onClick,
   className = '',
 }) => {
@@ -157,6 +186,24 @@ export const JobCard: React.FC<JobCardProps> = ({
             </Link>
           </div>
         )}
+
+        {/* Application Readiness — B5 (D1.4) */}
+        {readiness && (
+          <div onClick={stop}>
+            <Link href={`/jobs/${id}`} style={{ textDecoration: 'none' }}>
+              <StatusBadge status={readiness} variant={readinessVariant(readiness)} aria-label={`Readiness: ${readiness}`} />
+            </Link>
+          </div>
+        )}
+
+        {/* Company Opportunity — B3 (D1.4) */}
+        {companyOpportunity && (
+          <div onClick={stop}>
+            <Link href={`/jobs/${id}`} style={{ textDecoration: 'none' }}>
+              <StatusBadge status={companyOpportunity} variant={companyOpportunityVariant(companyOpportunity)} aria-label={`Company opportunity: ${companyOpportunity}`} />
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* Footer row */}
@@ -184,6 +231,19 @@ export const JobCard: React.FC<JobCardProps> = ({
                 <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
               </svg>
               {age}
+            </span>
+          )}
+          {/* Confidence — subtle footer signal (D1.4) */}
+          {confidence != null && confidence > 0 && (
+            <span
+              style={{
+                fontSize: '0.6875rem',
+                color: 'var(--text-muted)',
+                fontVariantNumeric: 'tabular-nums',
+              }}
+              aria-label={`Confidence: ${confidence}%`}
+            >
+              {confidence}% conf
             </span>
           )}
         </div>
