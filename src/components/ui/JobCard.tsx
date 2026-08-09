@@ -50,9 +50,12 @@ const decisionLabel = (d: string): string => {
 };
 
 const competitionVariant = (c: string): 'success' | 'warning' | 'danger' | 'neutral' => {
-  if (c === 'LOW') return 'success';
-  if (c === 'MEDIUM') return 'warning';
-  if (c === 'HIGH') return 'danger';
+  // Handles both the older discoveryIntelligence vocabulary (LOW/MEDIUM/HIGH)
+  // and the B2 competitionResults vocabulary (Very Low/Low/Medium/High/Very High).
+  const normalized = c.trim().toLowerCase();
+  if (normalized === 'low' || normalized === 'very low') return 'success';
+  if (normalized === 'medium') return 'warning';
+  if (normalized === 'high' || normalized === 'very high') return 'danger';
   return 'neutral';
 };
 

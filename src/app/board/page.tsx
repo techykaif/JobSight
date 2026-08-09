@@ -1,6 +1,6 @@
 import { db } from '@/lib/db/client';
 import * as schema from '@/lib/db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, inArray } from 'drizzle-orm';
 import Link from 'next/link';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { JobCard } from '@/components/ui/JobCard';
@@ -80,6 +80,7 @@ export default async function DecisionBoardPage() {
     .select({
       id: schema.jobs.id,
       title: schema.jobs.canonicalTitle,
+      companyId: schema.jobs.companyId,
       company: schema.companies.displayName,
       salaryMin: schema.jobs.salaryMin,
       salaryMax: schema.jobs.salaryMax,
@@ -106,6 +107,57 @@ export default async function DecisionBoardPage() {
     }
   });
   const uniqueJobs = Array.from(uniqueJobsMap.values());
+
+  // ── D1.4: B2/B3/B5 + decision-confidence intelligence ──────────────────
+  // These are separate, small, batched lookups (not joins) rather than
+  // extending the query above with more leftJoins: competitionResults,
+  // applicationResults, decisionResults and companyOpportunity each carry a
+  // runId and can accumulate one row per hunt run, so a plain join risks
+  // picking an arbitrary (not necessarily latest) run's row for a job that
+  // has been hunted more than once - the existing uniqueJobsMap dedup above
+  // already accepts that imprecision for the fields it was written for, but
+  // it shouldn't be extended to more signals. This stays O(1) queries
+  // total (chunked by 100 ids), not one query per card, so it doesn't
+  // introduce N+1.
+  const jobIds = uniqueJobs.map(j => j.id);
+  const companyIds = [...new Set(uniqueJobs.map(j => j.companyId).filter((id): id is string => !!id))];
+
+  function chunk<T>(arr: T[], size = 100): T[][] {
+    const out: T[][] = [];
+    for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+    return out;
+  }
+
+  /** Reduces a list of {key, createdAt, ...} rows to the latest row per key. */
+  function latestByKey<T extends { createdAt: string }>(rows: T[], keyOf: (row: T) => string): Map<string, T> {
+    const out = new Map<string, T>();
+    for (const row of rows) {
+      const key = keyOf(row);
+      const existing = out.get(key);
+      if (!existing || row.createdAt > existing.createdAt) out.set(key, row);
+    }
+    return out;
+  }
+
+  const competitionRows: (typeof schema.competitionResults.$inferSelect)[] = [];
+  const applicationRows: (typeof schema.applicationResults.$inferSelect)[] = [];
+  const decisionResultRows: (typeof schema.decisionResults.$inferSelect)[] = [];
+  for (const idChunk of chunk(jobIds)) {
+    if (idChunk.length === 0) continue;
+    competitionRows.push(...await db.select().from(schema.competitionResults).where(inArray(schema.competitionResults.jobId, idChunk)));
+    applicationRows.push(...await db.select().from(schema.applicationResults).where(inArray(schema.applicationResults.jobId, idChunk)));
+    decisionResultRows.push(...await db.select().from(schema.decisionResults).where(inArray(schema.decisionResults.jobId, idChunk)));
+  }
+  const companyOpportunityRows: (typeof schema.companyOpportunity.$inferSelect)[] = [];
+  for (const idChunk of chunk(companyIds)) {
+    if (idChunk.length === 0) continue;
+    companyOpportunityRows.push(...await db.select().from(schema.companyOpportunity).where(inArray(schema.companyOpportunity.companyId, idChunk)));
+  }
+
+  const competitionByJobId = latestByKey(competitionRows, r => r.jobId);
+  const applicationByJobId = latestByKey(applicationRows, r => r.jobId);
+  const decisionConfidenceByJobId = latestByKey(decisionResultRows, r => r.jobId);
+  const companyOpportunityByCompanyId = latestByKey(companyOpportunityRows, r => r.companyId);
 
   const buckets: Record<string, typeof uniqueJobs> = {
     'Apply Now':       uniqueJobs.filter(j => j.decision === 'APPLY' || j.decision === 'APPLY_NOW'),
@@ -242,22 +294,32 @@ export default async function DecisionBoardPage() {
                     </p>
                   </div>
                 ) : (
-                  jobs.map(job => (
-                    <JobCard
-                      key={job.id}
-                      id={job.id}
-                      title={job.title || 'Unknown Role'}
-                      company={job.company || 'Unknown Company'}
-                      salaryMin={job.salaryMin ?? undefined}
-                      salaryMax={job.salaryMax ?? undefined}
-                      remote={job.remoteType === 'REMOTE' || job.remoteType === 'FULLY_REMOTE'}
-                      score={job.opportunityScore ?? undefined}
-                      competition={job.competition || undefined}
-                      age={job.firstSeenAt ? `${getAgeInDays(job.firstSeenAt)}d ago` : undefined}
-                      decision={job.decision ?? undefined}
-                      className="board-card"
-                    />
-                  ))
+                  jobs.map(job => {
+                    const competitionResult = competitionByJobId.get(job.id);
+                    const applicationResult = applicationByJobId.get(job.id);
+                    const decisionResult = decisionConfidenceByJobId.get(job.id);
+                    const companyOpportunityResult = job.companyId ? companyOpportunityByCompanyId.get(job.companyId) : undefined;
+
+                    return (
+                      <JobCard
+                        key={job.id}
+                        id={job.id}
+                        title={job.title || 'Unknown Role'}
+                        company={job.company || 'Unknown Company'}
+                        salaryMin={job.salaryMin ?? undefined}
+                        salaryMax={job.salaryMax ?? undefined}
+                        remote={job.remoteType === 'REMOTE' || job.remoteType === 'FULLY_REMOTE'}
+                        score={job.opportunityScore ?? undefined}
+                        competition={competitionResult?.level ?? job.competition ?? undefined}
+                        readiness={applicationResult?.readinessLevel}
+                        companyOpportunity={companyOpportunityResult?.level}
+                        confidence={decisionResult?.confidence ?? undefined}
+                        age={job.firstSeenAt ? `${getAgeInDays(job.firstSeenAt)}d ago` : undefined}
+                        decision={job.decision ?? undefined}
+                        className="board-card"
+                      />
+                    );
+                  })
                 )}
               </div>
             </div>
