@@ -1,6 +1,6 @@
 import { db } from '@/lib/db/client';
 import * as schema from '@/lib/db/schema';
-import { eq, desc, asc, count } from 'drizzle-orm';
+import { eq, desc, asc, count, and } from 'drizzle-orm';
 import Link from 'next/link';
 
 import RunControls from '@/components/RunControls';
@@ -77,6 +77,22 @@ export default async function HuntDetailPage({ params }: { params: Promise<{ id:
   const [companyResearchCount = { c: 0 }] = await db.select({ c: count() })
     .from(schema.companyAnalysis).where(eq(schema.companyAnalysis.runId, run.id));
 
+  // Intelligence Health B1-B7
+  const [b1CountRes = { c: 0 }] = await db.select({ c: count() }).from(schema.scores).where(and(eq(schema.scores.runId, run.id), eq(schema.scores.scoreType, 'RESUME_MATCH')));
+  const [b2CountRes = { c: 0 }] = await db.select({ c: count() }).from(schema.competitionResults).where(eq(schema.competitionResults.runId, run.id));
+  const [b3CountRes = { c: 0 }] = await db.select({ c: count() }).from(schema.companyOpportunity).where(eq(schema.companyOpportunity.runId, run.id));
+  const [b4CountRes = { c: 0 }] = await db.select({ c: count() }).from(schema.discoveryIntelligence).where(eq(schema.discoveryIntelligence.runId, run.id));
+  const [b5CountRes = { c: 0 }] = await db.select({ c: count() }).from(schema.applicationResults).where(eq(schema.applicationResults.runId, run.id));
+  const [b7CountRes = { c: 0 }] = await db.select({ c: count() }).from(schema.decisionResults).where(eq(schema.decisionResults.runId, run.id));
+
+  // Geographic Health B6
+  const [b6EligibleRes = { count: 0 }] = await db.select({ count: count() }).from(schema.jobs).innerJoin(schema.jobObservations, eq(schema.jobs.id, schema.jobObservations.jobId)).where(and(eq(schema.jobObservations.runId, run.id), eq(schema.jobs.candidateRemoteEligibility, 'ELIGIBLE')));
+  const [b6NotEligibleRes = { count: 0 }] = await db.select({ count: count() }).from(schema.jobs).innerJoin(schema.jobObservations, eq(schema.jobs.id, schema.jobObservations.jobId)).where(and(eq(schema.jobObservations.runId, run.id), eq(schema.jobs.candidateRemoteEligibility, 'NOT_ELIGIBLE')));
+  const [b6UnknownRes = { count: 0 }] = await db.select({ count: count() }).from(schema.jobs).innerJoin(schema.jobObservations, eq(schema.jobs.id, schema.jobObservations.jobId)).where(and(eq(schema.jobObservations.runId, run.id), eq(schema.jobs.candidateRemoteEligibility, 'UNKNOWN')));
+
+  const discoveryEvent = eventsData.find(e => e.eventType === 'DISCOVERY_BATCH_COMPLETED')?.payload as any;
+  const stageBEvent = eventsData.find(e => e.eventType === 'STAGE_B_TELEMETRY')?.payload as any;
+
   const providersSet = new Set<string>();
   eventsData.forEach(ev => {
     if (ev.payload && typeof ev.payload === 'object' && 'provider' in (ev.payload as any)) {
@@ -134,16 +150,48 @@ export default async function HuntDetailPage({ params }: { params: Promise<{ id:
 
       {!isCompleted && <RunControls runId={run.id} initialStatus={run.status} />}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
-        <MetricCard label="Duration" value={duration} />
-        <MetricCard label="Providers Used" value={providersSet.size.toString()} />
-        <MetricCard label="Jobs Found" value={observationsCount.c.toString()} />
-        <MetricCard label="Company Research" value={(companyResearchCount.c + researchCount).toString()} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
+        <MetricCard label="Run Duration" value={duration} />
+        <MetricCard label="Jobs Persisted" value={observationsCount.c.toString()} />
+        <MetricCard label="Accepted" value={accepted.toString()} trend={{ value: 100, isPositive: true }} />
+        <MetricCard label="Rejected" value={rejected.toString()} trend={{ value: 100, isPositive: false }} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
-        <MetricCard label="Qualified & Accepted" value={accepted.toString()} trend={{ value: 100, isPositive: true }} />
-        <MetricCard label="Rejected" value={rejected.toString()} trend={{ value: 100, isPositive: false }} />
+        <div style={{ backgroundColor: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+          <h3 style={{ marginTop: 0, fontSize: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>Discovery Health (Stage A/B)</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1rem' }}>
+            <div><div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Discovered (Raw)</div><div style={{ fontSize: '1.25rem', fontWeight: 600 }}>{discoveryEvent?.discovered ?? '-'}</div></div>
+            <div><div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Structured</div><div style={{ fontSize: '1.25rem', fontWeight: 600 }}>{discoveryEvent?.structured ?? '-'}</div></div>
+            <div><div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Valid Schema</div><div style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--success-text)' }}>{discoveryEvent?.valid ?? '-'}</div></div>
+            <div><div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Failed</div><div style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--danger-text)' }}>{discoveryEvent?.failed ?? '-'}</div></div>
+          </div>
+          <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)', fontSize: '0.8125rem' }}>
+            <span style={{ color: 'var(--text-secondary)' }}>Stage B Processing: </span>
+            {stageBEvent ? (
+               <span style={{ color: stageBEvent.success ? 'var(--success-text)' : 'var(--danger-text)' }}>
+                 {stageBEvent.success ? `Success (${stageBEvent.latencyMs}ms)` : `Failed (${stageBEvent.error || 'Unknown'})`}
+               </span>
+            ) : <span style={{ color: 'var(--text-muted)' }}>Pending / Skipped</span>}
+          </div>
+        </div>
+
+        <div style={{ backgroundColor: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+          <h3 style={{ marginTop: 0, fontSize: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>Intelligence Processing</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginTop: '1rem' }}>
+            <div><div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>B1 Qualification</div><div style={{ fontSize: '1.125rem', fontWeight: 600 }}>{b1CountRes.c}</div></div>
+            <div><div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>B2 Competition</div><div style={{ fontSize: '1.125rem', fontWeight: 600 }}>{b2CountRes.c}</div></div>
+            <div><div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>B3 Opportunity</div><div style={{ fontSize: '1.125rem', fontWeight: 600 }}>{b3CountRes.c}</div></div>
+            <div><div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>B4 Discovery</div><div style={{ fontSize: '1.125rem', fontWeight: 600 }}>{b4CountRes.c}</div></div>
+            <div><div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>B5 Application</div><div style={{ fontSize: '1.125rem', fontWeight: 600 }}>{b5CountRes.c}</div></div>
+            <div><div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>B7 Learning</div><div style={{ fontSize: '1.125rem', fontWeight: 600 }}>{b7CountRes.c}</div></div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+            <div><div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>B6 Eligible</div><div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--success-text)' }}>{b6EligibleRes.count}</div></div>
+            <div><div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>B6 Ineligible</div><div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--danger-text)' }}>{b6NotEligibleRes.count}</div></div>
+            <div><div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>B6 Unknown</div><div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-muted)' }}>{b6UnknownRes.count}</div></div>
+          </div>
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem', marginBottom: '2rem' }}>
@@ -185,7 +233,7 @@ export default async function HuntDetailPage({ params }: { params: Promise<{ id:
                   <th>Stage</th>
                   <th>Job/Unit</th>
                   <th>Failure Category</th>
-                  <th>Attempt</th>
+                  <th>Recovery State</th>
                   <th>Message</th>
                   <th>Time</th>
                 </tr>
@@ -203,7 +251,11 @@ export default async function HuntDetailPage({ params }: { params: Promise<{ id:
                         {f.entityId ? <Link href={`/${f.entityType === 'JOB' ? 'jobs' : 'companies'}/${f.entityId}`} style={{ color: 'inherit' }}>{unit}</Link> : unit}
                       </td>
                       <td>{f.failureCode}</td>
-                      <td>{f.attempt}{f.retryable ? '' : ' (Final)'}</td>
+                      <td>
+                        <span style={{ color: f.retryable ? 'var(--warning-text)' : 'var(--danger-text)' }}>
+                          {f.retryable ? `Retryable (Attempt ${f.attempt})` : `Terminal (Failed)`}
+                        </span>
+                      </td>
                       <td style={{ color: 'var(--danger-text)' }}>{f.message}</td>
                       <td style={{ color: 'var(--text-secondary)' }}>{new Date(f.createdAt).toLocaleTimeString()}</td>
                     </tr>
