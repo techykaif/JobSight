@@ -67,7 +67,7 @@ export const jobs = sqliteTable('jobs', {
   companyId: text('company_id').references(() => companies.id), // Nullable if company unknown
   canonicalTitle: text('canonical_title'),
   normalizedTitle: text('normalized_title'),
-  canonicalUrl: text('canonical_url').unique(),
+  canonicalUrl: text('canonical_url').notNull().unique(),
   location: text('location'),
   remoteType: text('remote_type'), // e.g., 'REMOTE', 'ONSITE', 'HYBRID'
   candidateRemoteEligibility: text('candidate_remote_eligibility'), // ELIGIBLE, NOT_ELIGIBLE, UNKNOWN

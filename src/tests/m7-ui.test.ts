@@ -61,7 +61,7 @@ describe('Milestone 7: UI & Persistence Validation', () => {
 
   it('handles unknown/null values safely in queries', async () => {
     const jobId = crypto.randomUUID();
-    await db.insert(schema.jobs).values({
+    await db.insert(schema.jobs).values({ canonicalUrl: `https://example.com/job-${crypto.randomUUID()}`,
       id: jobId,
       firstSeenAt: new Date().toISOString(),
       lastSeenAt: new Date().toISOString(),

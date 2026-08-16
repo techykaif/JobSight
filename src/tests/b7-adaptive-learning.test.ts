@@ -99,7 +99,7 @@ describe('B7 Adaptive Learning Intelligence', () => {
     });
 
     const jobId = crypto.randomUUID();
-    await db.insert(schema.jobs).values({
+    await db.insert(schema.jobs).values({ canonicalUrl: `https://example.com/job-${crypto.randomUUID()}`,
       id: jobId,
       companyId: 'compA',
       remoteType: 'REMOTE',
@@ -171,7 +171,7 @@ describe('B7 Adaptive Learning Intelligence', () => {
 
     for (let i = 0; i < 4; i++) {
       const jobId = crypto.randomUUID();
-      await db.insert(schema.jobs).values({
+      await db.insert(schema.jobs).values({ canonicalUrl: `https://example.com/job-${crypto.randomUUID()}`,
         id: jobId,
         companyId: 'compB',
         remoteType: 'ONSITE',
@@ -244,7 +244,7 @@ describe('B7 Adaptive Learning Intelligence', () => {
 
     for (let i = 0; i < 4; i++) {
       const jobId = crypto.randomUUID();
-      await db.insert(schema.jobs).values({
+      await db.insert(schema.jobs).values({ canonicalUrl: `https://example.com/job-${crypto.randomUUID()}`,
         id: jobId,
         companyId: 'compC',
         remoteType: 'ONSITE',
@@ -368,7 +368,7 @@ describe('B7 Adaptive Learning Intelligence', () => {
 
     for (let i = 0; i < 5; i++) {
       const jobId = crypto.randomUUID();
-      await db.insert(schema.jobs).values({ id: jobId, companyId: 'compIso', remoteType: 'REMOTE', status: 'ACTIVE', firstSeenAt: new Date().toISOString(), lastSeenAt: new Date().toISOString(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+      await db.insert(schema.jobs).values({ canonicalUrl: `https://example.com/job-${crypto.randomUUID()}`, id: jobId, companyId: 'compIso', remoteType: 'REMOTE', status: 'ACTIVE', firstSeenAt: new Date().toISOString(), lastSeenAt: new Date().toISOString(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
       await db.insert(schema.jobObservations).values({ id: crypto.randomUUID(), jobId, runId: runA, observedAt: new Date().toISOString() });
       await db.insert(schema.decisionHistory).values({ id: crypto.randomUUID(), jobId, previousDecision: 'CONSIDER', newDecision: 'APPLY_NOW', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
     }

@@ -112,7 +112,7 @@ describe('Bounded Over-Discovery', () => {
 
     for (const title of jobTitles) {
       const jobId = crypto.randomUUID();
-      await db.insert(schema.jobs).values({
+      await db.insert(schema.jobs).values({ canonicalUrl: `https://example.com/job-${crypto.randomUUID()}`,
         id: jobId,
         canonicalTitle: title,
         status: 'ACTIVE',
@@ -175,7 +175,7 @@ describe('Bounded Over-Discovery', () => {
 
     for (const title of jobTitles) {
       const jobId = crypto.randomUUID();
-      await db.insert(schema.jobs).values({
+      await db.insert(schema.jobs).values({ canonicalUrl: `https://example.com/job-${crypto.randomUUID()}`,
         id: jobId,
         canonicalTitle: title,
         status: 'ACTIVE',
@@ -242,7 +242,7 @@ describe('Bounded Over-Discovery', () => {
 
     for (const title of jobTitles) {
       const jobId = crypto.randomUUID();
-      await db.insert(schema.jobs).values({
+      await db.insert(schema.jobs).values({ canonicalUrl: `https://example.com/job-${crypto.randomUUID()}`,
         id: jobId,
         canonicalTitle: title,
         status: 'ACTIVE',

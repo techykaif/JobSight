@@ -106,7 +106,7 @@ describe('M9 Bugfixes: Orchestrator & Qualification', () => {
 
     for (const job of jobsData) {
       const jobId = crypto.randomUUID();
-      await db.insert(schema.jobs).values({
+      await db.insert(schema.jobs).values({ canonicalUrl: `https://example.com/job-${crypto.randomUUID()}`,
         id: jobId,
         canonicalTitle: job.title,
         status: 'ACTIVE',
@@ -175,7 +175,7 @@ describe('M9 Bugfixes: Orchestrator & Qualification', () => {
       { title: 'Principal Software Engineer CRASH', experienceMin: 12 } // This is a deterministic SKIP, wait, if title says CRASH it crashes.
     ]);
     // Let's use a non-crash Principal job to test deterministic skip
-    await db.insert(schema.jobs).values({
+    await db.insert(schema.jobs).values({ canonicalUrl: `https://example.com/job-${crypto.randomUUID()}`,
       id: crypto.randomUUID(),
       canonicalTitle: 'Principal Software Engineer',
       status: 'ACTIVE',
@@ -230,7 +230,7 @@ describe('M9 Bugfixes: Orchestrator & Qualification', () => {
     const runId = await setupTest({ salaryExpectations: null }, []);
     
     // Insert a job that will definitely be SKIPPED
-    await db.insert(schema.jobs).values({
+    await db.insert(schema.jobs).values({ canonicalUrl: `https://example.com/job-${crypto.randomUUID()}`,
       id: crypto.randomUUID(),
       canonicalTitle: 'Skipped Job',
       status: 'ACTIVE',

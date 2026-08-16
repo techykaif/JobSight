@@ -1,4 +1,5 @@
 import type { CandidateJob } from './extractionSchema.js';
+import { validateOriginalJobUrl } from './url-validator.js';
 
 export class ValidationError extends Error {
   constructor(message: string) {
@@ -18,8 +19,11 @@ export function normalizeJobExtraction(candidate: CandidateJob): CandidateJob {
   if (!job.job?.title || job.job.title.trim() === '') {
     throw new ValidationError('Missing job title');
   }
-  if (!job.job?.url || job.job.url.trim() === '') {
-    throw new ValidationError('Missing job url');
+  
+  try {
+    job.job.url = validateOriginalJobUrl(job.job?.url);
+  } catch (e: any) {
+    throw new ValidationError(`Invalid job url: ${e.message}`);
   }
 
 

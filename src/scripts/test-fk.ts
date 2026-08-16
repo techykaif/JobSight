@@ -6,17 +6,21 @@ async function main() {
   console.log('Testing Foreign Key Integrity...');
   try {
     const dummyId = crypto.randomUUID();
+    const now = new Date().toISOString();
     // Insert job without valid company
-    await db.insert(schema.jobs).values({
-      id: crypto.randomUUID(),
-      companyId: dummyId, // Does not exist
-      canonicalTitle: 'FK Test Job',
-      status: 'ACTIVE',
-      firstSeenAt: new Date().toISOString(),
-      lastSeenAt: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    });
+    await db.insert(schema.jobs).values([
+      {
+        id: 'job1',
+        companyId: 'comp1',
+        remoteType: 'REMOTE',
+        status: 'ACTIVE',
+        firstSeenAt: now,
+        lastSeenAt: now,
+        createdAt: now,
+        updatedAt: now,
+        canonicalUrl: 'https://example.com/jobs/1'
+      }
+    ] as any);
     console.error('❌ FK constraint failed to trigger. Foreign keys might be disabled!');
     process.exit(1);
   } catch (err: any) {

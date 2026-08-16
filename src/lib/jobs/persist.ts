@@ -24,8 +24,8 @@ export function normalizeUrl(urlStr: string): string {
     }
     url.pathname = path;
     return url.toString();
-  } catch {
-    return urlStr.toLowerCase().trim();
+  } catch (e: any) {
+    throw new Error(`Invalid URL for normalization: ${urlStr}`);
   }
 }
 
