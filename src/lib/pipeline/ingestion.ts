@@ -4,6 +4,7 @@ import * as repos from '../db/repositories/index.js';
 import { StructuringOutputSchema, EXTERNAL_AGY_STRUCTURING_CONTRACT, CandidateJobSchema } from '../jobs/extractionSchema.js';
 import { normalizeJobExtraction, ValidationError } from '../jobs/normalize.js';
 import { persistCandidateJob } from '../jobs/persist.js';
+import { evaluateGeographicEligibility } from '../geographic-eligibility/evaluator.js';
 import { z } from 'zod';
 import { runDiscovery } from '../discovery/orchestrator.js';
 export async function runIngestionPipeline(runId: string, config: any, abortSignal?: AbortSignal) {
@@ -248,6 +249,20 @@ ${chunk}
 
       // If sources is STILL empty here, the normalizer will skip it (since it's not required in our schema)
       // or we can just leave it empty. We removed the normalizer throw, so it will persist as UNKNOWN.
+
+      // 2.5 Geographic Eligibility Intelligence (B6)
+      const b6Result = evaluateGeographicEligibility(
+        candidate.job.location,
+        candidate.description?.summary,
+        candidate.job.remoteType,
+        config.candidateCountry
+      );
+
+      // Mutate the candidate to safely feed the existing field and the new richer fields
+      candidate.job.candidateRemoteEligibility = b6Result.eligibilityStatus === 'NEEDS_VERIFICATION' ? 'UNKNOWN' : b6Result.eligibilityStatus;
+      candidate.job.geographicRemoteScope = b6Result.remoteScope;
+      candidate.job.geographicEligibilityReason = b6Result.eligibilityReason;
+      candidate.job.geographicEligibilityConfidence = b6Result.eligibilityConfidence;
 
       // 3. Normalization
       const normalized = normalizeJobExtraction(candidate);

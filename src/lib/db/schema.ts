@@ -71,6 +71,9 @@ export const jobs = sqliteTable('jobs', {
   location: text('location'),
   remoteType: text('remote_type'), // e.g., 'REMOTE', 'ONSITE', 'HYBRID'
   candidateRemoteEligibility: text('candidate_remote_eligibility'), // ELIGIBLE, NOT_ELIGIBLE, UNKNOWN
+  geographicRemoteScope: text('geographic_remote_scope'), // WORLDWIDE, COUNTRY_SPECIFIC, REGION_SPECIFIC, UNCLEAR, ONSITE, HYBRID
+  geographicEligibilityReason: text('geographic_eligibility_reason'),
+  geographicEligibilityConfidence: text('geographic_eligibility_confidence'), // HIGH, MEDIUM, LOW
   employmentType: text('employment_type'),
   
   // Normalized for ranking/display

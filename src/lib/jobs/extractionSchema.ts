@@ -26,6 +26,9 @@ export const CandidateJobSchema = z.object({
     location: z.string().nullable().optional(),
     remoteType: z.enum(['REMOTE', 'HYBRID', 'ONSITE']).nullable().optional(),
     candidateRemoteEligibility: z.enum(['ELIGIBLE', 'NOT_ELIGIBLE', 'UNKNOWN']).nullable().optional(),
+    geographicRemoteScope: z.enum(['WORLDWIDE', 'COUNTRY_SPECIFIC', 'REGION_SPECIFIC', 'UNCLEAR', 'ONSITE', 'HYBRID']).nullable().optional(),
+    geographicEligibilityReason: z.string().nullable().optional(),
+    geographicEligibilityConfidence: z.enum(['HIGH', 'MEDIUM', 'LOW']).nullable().optional(),
     employmentType: z.string().nullable().optional(),
     status: z.enum(['ACTIVE', 'INACTIVE', 'UNKNOWN']).default('ACTIVE'),
     externalJobId: z.string().nullable().optional()
