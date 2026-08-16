@@ -877,6 +877,51 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
       });
     }
 
+    // 5. Candidate Decision Intelligence (D1.7.5)
+    await updateState('CANDIDATE_DECISION', 'DECISION');
+    
+    const { evaluateCandidateDecision } = await import('../candidate-decision/engine.js');
+    const b7Results = await db.select().from(schema.decisionResults).where(eq(schema.decisionResults.runId, runId));
+    const fitResults = await db.select().from(schema.candidateFitResults).where(eq(schema.candidateFitResults.runId, runId));
+    const hasSnapshot = !!run.profileSnapshot;
+
+    for (const job of validJobsMap.values()) {
+      const b7Dec = b7Results.find(r => r.jobId === job.id);
+      const fit = fitResults.find(r => r.jobId === job.id);
+      
+      const geoEligibility = {
+        eligibilityStatus: job.candidateRemoteEligibility as 'ELIGIBLE' | 'NOT_ELIGIBLE' | 'NEEDS_VERIFICATION' | undefined,
+        remoteScope: job.geographicRemoteScope as any,
+        eligibilityConfidence: job.geographicEligibilityConfidence as any,
+        eligibilityReason: job.geographicEligibilityReason || ''
+      };
+
+      const decision = evaluateCandidateDecision(
+        hasSnapshot,
+        fit as any,
+        b7Dec?.decision as any,
+        geoEligibility as any
+      );
+
+      await db.insert(schema.candidateDecisions)
+        .values({
+          id: crypto.randomUUID(),
+          runId,
+          jobId: job.id,
+          finalDecision: decision.finalDecision,
+          primaryReason: decision.primaryReason,
+          createdAt: new Date().toISOString()
+        })
+        .onConflictDoUpdate({
+          target: [schema.candidateDecisions.runId, schema.candidateDecisions.jobId],
+          set: {
+            finalDecision: decision.finalDecision,
+            primaryReason: decision.primaryReason,
+            createdAt: new Date().toISOString()
+          }
+        });
+    }
+
     // FINISH
     const finalFailures = await db.select().from(schema.failures).where(eq(schema.failures.runId, runId));
     const unrecoveredFailures = finalFailures.filter(f => f.attempt >= 2 || !f.retryable);

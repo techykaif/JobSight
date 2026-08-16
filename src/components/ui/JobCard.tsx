@@ -21,6 +21,7 @@ export interface JobCardProps {
   provider?: string | undefined;
   age?: string | undefined;
   decision?: string | undefined;
+  primaryReason?: string | undefined;
   // ── Intelligence extensions (D1.4) ──────────────────────────────
   /** Application readiness level from B5 applicationResults */
   readiness?: string | undefined;
@@ -37,9 +38,10 @@ export interface JobCardProps {
 
 const decisionVariant = (d: string): 'success' | 'warning' | 'danger' | 'info' | 'neutral' => {
   if (d === 'APPLY' || d === 'APPLY_NOW') return 'success';
-  if (d === 'CONSIDER' || d === 'APPLY_LATER') return 'warning';
-  if (d === 'SKIP' || d === 'REJECTED') return 'danger';
+  if (d === 'CONSIDER' || d === 'APPLY_LATER' || d === 'REVIEW') return 'warning';
+  if (d === 'SKIP' || d === 'REJECTED' || d === 'INELIGIBLE') return 'danger';
   if (d === 'RESEARCH_REQUIRED') return 'info';
+  if (d === 'INSUFFICIENT_EVIDENCE') return 'neutral';
   return 'neutral';
 };
 
@@ -47,6 +49,9 @@ const decisionLabel = (d: string): string => {
   if (d === 'APPLY' || d === 'APPLY_NOW') return 'Apply';
   if (d === 'CONSIDER' || d === 'APPLY_LATER') return 'Consider';
   if (d === 'SKIP' || d === 'REJECTED') return 'Skip';
+  if (d === 'REVIEW') return 'Review';
+  if (d === 'INELIGIBLE') return 'Ineligible';
+  if (d === 'INSUFFICIENT_EVIDENCE') return 'Unknown Fit';
   if (d === 'RESEARCH_REQUIRED') return 'Research';
   return d.replace(/_/g, ' ');
 };
@@ -91,6 +96,7 @@ export const JobCard: React.FC<JobCardProps> = ({
   provider,
   age,
   decision,
+  primaryReason,
   readiness,
   companyOpportunity,
   confidence,
@@ -224,6 +230,13 @@ export const JobCard: React.FC<JobCardProps> = ({
           </div>
         )}
       </div>
+
+      {/* Candidate Decision Reason */}
+      {primaryReason && (
+        <div style={{ marginBottom: 16, fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+          <strong>Decision:</strong> {primaryReason}
+        </div>
+      )}
 
       {/* Footer row */}
       <div style={{

@@ -11,6 +11,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ActionButton } from '@/components/ui/ActionButton';
 import { Timeline, type TimelineItem } from '@/components/ui/Timeline';
+import { JobCard } from '@/components/ui/JobCard';
 
 function formatDuration(start: string | null, end: string | null) {
   if (!start) return 'N/A';
@@ -58,6 +59,17 @@ export default async function HuntDetailPage({ params }: { params: Promise<{ id:
     .from(schema.pipelineEvents)
     .where(eq(schema.pipelineEvents.runId, run.id))
     .orderBy(asc(schema.pipelineEvents.timestamp));
+
+  // Fetch final decisions
+  const finalDecisionsData = await db.select({
+    decision: schema.candidateDecisions,
+    job: schema.jobs,
+    company: schema.companies
+  }).from(schema.candidateDecisions)
+    .innerJoin(schema.jobs, eq(schema.candidateDecisions.jobId, schema.jobs.id))
+    .leftJoin(schema.companies, eq(schema.jobs.companyId, schema.companies.id))
+    .where(eq(schema.candidateDecisions.runId, run.id))
+    .orderBy(desc(schema.candidateDecisions.createdAt));
 
   // Aggregations
   const decisionCounts = await db.select({
@@ -219,6 +231,30 @@ export default async function HuntDetailPage({ params }: { params: Promise<{ id:
           </div>
         </div>
       </div>
+
+      {finalDecisionsData.length > 0 && (
+        <div style={{ marginBottom: '2rem' }}>
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path></svg>
+            Candidate Decisions ({finalDecisionsData.length})
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
+            {finalDecisionsData.map(({ decision, job, company }) => (
+              <JobCard
+                key={decision.id}
+                id={job.id}
+                title={job.canonicalTitle || 'Unknown'}
+                company={company?.displayName || 'Unknown'}
+                salaryMin={job.salaryMin || undefined}
+                salaryMax={job.salaryMax || undefined}
+                remote={job.remoteType === 'REMOTE' || job.remoteType === 'HYBRID'}
+                decision={decision.finalDecision}
+                primaryReason={decision.primaryReason}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {failuresData.length > 0 && (
         <div style={{ marginBottom: '2rem' }}>

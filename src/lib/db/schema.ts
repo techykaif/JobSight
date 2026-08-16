@@ -609,6 +609,19 @@ export const candidateFitResults = sqliteTable('candidate_fit_results', {
   }
 });
 
+export const candidateDecisions = sqliteTable('candidate_decisions', {
+  id: text('id').primaryKey(),
+  runId: text('run_id').notNull().references(() => runs.id),
+  jobId: text('job_id').notNull().references(() => jobs.id),
+  finalDecision: text('final_decision').notNull(), // APPLY, REVIEW, SKIP, INELIGIBLE, INSUFFICIENT_EVIDENCE
+  primaryReason: text('primary_reason').notNull(),
+  createdAt: text('created_at').notNull()
+}, (table) => {
+  return {
+    candidateDecisionRunJobIdx: uniqueIndex('candidate_decisions_run_job_idx').on(table.runId, table.jobId)
+  }
+});
+
 export const applicationResults = sqliteTable('application_results', {
   id: text('id').primaryKey(),
   runId: text('run_id').references(() => runs.id),

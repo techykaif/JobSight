@@ -120,6 +120,13 @@
       "when": 1786914956667,
       "tag": "0016_silky_scrambler",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1786916908270,
+      "tag": "0017_wet_black_widow",
+      "breakpoints": true
     }
   ]
 }
