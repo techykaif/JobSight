@@ -1,5 +1,15 @@
 import { z } from 'zod';
 
+// A single education record — degree and institution are bound together.
+const educationRecordSchema = z.object({
+  degree: z.string().describe("The full name of the degree or program, e.g. 'Master of Computer Applications', 'BSc Computer Science', 'Diploma in Software Engineering'."),
+  institution: z.string().describe("The full name of the university, college, or institution for THIS specific degree. Never combine institution names from different degrees."),
+  fieldOfStudy: z.string().nullable().describe("Major or field of study, e.g. 'Computer Science', 'Information Technology'. Return null if not separately stated."),
+  status: z.string().nullable().describe("Enrollment or completion status: 'Pursuing' when currently enrolled or end year is Present/Current, 'Completed' when finished, 'Graduated', 'In Progress', or null if not stated."),
+  startYear: z.number().nullable().describe("The EXACT year printed next to THIS specific degree in the EDUCATION SECTION of the resume. Copy verbatim. Do NOT guess, infer, calculate, or borrow from work experience, projects, internships, or another education record. If not explicitly written, return null."),
+  endYear: z.number().nullable().describe("The EXACT end year printed next to THIS specific degree in the EDUCATION SECTION. Return null when the program is ongoing ('Present', 'Current', etc.). Do NOT guess, infer, or borrow dates from any other section or record."),
+});
+
 export const extractedProfileSchema = z.object({
   identity: z.object({
     summary: z.string().nullable().describe("A brief summary of the candidate's professional background and goals."),
@@ -14,11 +24,12 @@ export const extractedProfileSchema = z.object({
     portfolioProjects: z.array(z.string()).describe("Names and brief details of personal or portfolio projects. Do not fabricate projects if none are explicitly present. Never use an experience entry as a substitute project."),
     projectSkills: z.array(z.string()).describe("Specific skills, tools, and technologies used ONLY in personal/portfolio projects. Must be atomic technology names, not full sentences."),
   }).nullable(),
-  education: z.object({
-    degrees: z.array(z.string()).describe("Degrees earned, e.g. 'BSc', 'MSc'"),
-    institutions: z.array(z.string()).describe("Names of universities or institutions attended."),
-    fieldsOfStudy: z.array(z.string()).describe("Major or field of study, e.g. 'Computer Science'"),
-  }),
+  education: z.array(educationRecordSchema).describe(
+    "Array of education records. Each distinct degree/program is a SEPARATE entry. " +
+    "Never merge two degrees into one entry. Never merge two institutions into one institution string. " +
+    "If the resume has two degrees, return an array with two objects. " +
+    "If no education is present, return an empty array."
+  ),
   skills: z.object({
     programmingLanguages: z.array(z.string()).describe("Programming languages the candidate knows. Must be atomic atomic technology/tool names."),
     frameworks: z.array(z.string()).describe("Software frameworks, e.g. React, Spring Boot. Must be atomic names."),
@@ -44,4 +55,5 @@ export const extractedProfileSchema = z.object({
   }).nullable(),
 });
 
+export type EducationRecord = z.infer<typeof educationRecordSchema>;
 export type ExtractedProfile = z.infer<typeof extractedProfileSchema>;
