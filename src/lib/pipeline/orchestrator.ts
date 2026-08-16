@@ -766,7 +766,117 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
 
     // RANKING
     await updateState('RUNNING', 'RANKING');
-    
+
+    // 1. Find eligible candidates (passed hard filters)
+    const finalEligibleDecisions = await db.select().from(schema.decisions)
+      .where(eq(schema.decisions.runId, runId));
+
+    const validJobsMap = new Map<string, any>();
+    const runJobsQuery = await db.select().from(schema.jobObservations)
+      .innerJoin(schema.jobs, eq(schema.jobObservations.jobId, schema.jobs.id))
+      .where(eq(schema.jobObservations.runId, runId));
+
+    for (const r of runJobsQuery) {
+      validJobsMap.set(r.jobs.id, r.jobs);
+    }
+
+    const eligibleDecisions = finalEligibleDecisions.filter(d =>
+      ['APPLY', 'CONSIDER', 'RESEARCH_REQUIRED'].includes(d.decision) && validJobsMap.has(d.jobId)
+    );
+
+    const { runDecisionEngine, generateDecisionQueue } = await import('../decision/engine.js');
+    const { calculateB7Modifiers } = await import('../adaptive-learning/engine.js');
+
+    const decisionsWithContext = [];
+
+    for (const ed of eligibleDecisions) {
+      const job = validJobsMap.get(ed.jobId);
+
+      // Load intelligence results needed for context
+      const discRec = await db.select().from(schema.oppDiscoveryResults).where(eq(schema.oppDiscoveryResults.jobId, job.id)).limit(1);
+      const discSigs = await db.select().from(schema.oppDiscoverySignals).where(eq(schema.oppDiscoverySignals.jobId, job.id));
+
+      const oppRec = await db.select().from(schema.opportunityIntelligence).where(eq(schema.opportunityIntelligence.jobId, job.id)).limit(1);
+
+      const discovery = {
+        result: discRec[0] || { level: 'STANDARD', score: 50, confidence: 50 },
+        signals: discSigs,
+        visibility: 'UNKNOWN', authenticity: 'UNKNOWN', competition: 'UNKNOWN', freshness: 'UNKNOWN'
+      };
+
+      // Attempt to load DiscoveryIntelligence summary to get authenticity/freshness if needed
+      const discSumRec = await db.select().from(schema.oppDiscoverySummary).where(eq(schema.oppDiscoverySummary.jobId, job.id)).limit(1);
+      if (discSumRec[0]) {
+        discovery.authenticity = discSumRec[0].authenticity;
+        discovery.visibility = discSumRec[0].visibility;
+        discovery.competition = discSumRec[0].competition;
+      }
+
+      const opportunity = oppRec[0] || { opportunityScore: 50, priority: 'NORMAL', recommendedAction: 'CONSIDER' };
+
+      const context = {
+        job,
+        runId,
+        discovery: discovery as any,
+        opportunity: opportunity as any
+      };
+
+      try {
+        const result = await runDecisionEngine(context);
+        decisionsWithContext.push({ context, result });
+      } catch (err) {
+        console.warn(`[RANKING] Strategy evaluation failed for ${job.id}:`, err);
+      }
+    }
+
+    // Existing ranking queue (prior to B7 nudges)
+    // We will generate the final queue with B7 modifiers
+
+    // 2. Calculate B7 personalization modifier
+    const learningContext = { runId, configId: config.id };
+    // Pass a dummy queue to calculate traits based on what we're evaluating
+    const b7QueueInput = decisionsWithContext.map((d, i) => ({
+      jobId: (d.context.job as any).id,
+      rank: i + 1,
+      result: d.result,
+      context: d.context
+    }));
+
+    const learningModifiers = await calculateB7Modifiers(learningContext, b7QueueInput);
+
+    // 3. Final queue generation
+    const finalQueue = await generateDecisionQueue(runId, decisionsWithContext, learningModifiers);
+
+    // 4. Persist the queue
+    for (const q of finalQueue) {
+      await db.insert(schema.decisionQueue).values({
+        id: crypto.randomUUID(),
+        runId,
+        jobId: (q.context.job as any).id, // Ensure we use DB ID, not sourceUrl
+        queueRank: q.rank,
+        decision: q.result.decision,
+        recommendedAction: q.result.requiredActions?.[0] || 'CONSIDER',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+
+      await db.insert(schema.decisionResults).values({
+        id: crypto.randomUUID(),
+        jobId: (q.context.job as any).id,
+        runId,
+        decision: q.result.decision,
+        priority: q.result.priority.toString(),
+        confidence: q.result.confidence,
+        reasons: q.result.reasons,
+        unknowns: q.result.unknowns,
+        requiredActions: q.result.requiredActions,
+        roiLevel: q.result.roiLevel,
+        urgencyLevel: q.result.urgencyLevel,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+    }
+
     // FINISH
     const finalFailures = await db.select().from(schema.failures).where(eq(schema.failures.runId, runId));
     const unrecoveredFailures = finalFailures.filter(f => f.attempt >= 2 || !f.retryable);

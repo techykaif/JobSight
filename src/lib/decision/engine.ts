@@ -75,8 +75,21 @@ export async function runDecisionEngine(context: DecisionContext): Promise<Decis
   throw new Error('No decision strategy returned a result (FallbackStrategy missing?)');
 }
 
-export async function generateDecisionQueue(runId: string, decisions: Array<{ context: DecisionContext, result: DecisionResult }>): Promise<QueuedDecision[]> {
-  const sorted = [...decisions].sort((a, b) => b.result.priority - a.result.priority);
+export async function generateDecisionQueue(
+  runId: string,
+  decisions: Array<{ context: DecisionContext, result: DecisionResult }>,
+  learningModifiers?: { [jobId: string]: number }
+): Promise<QueuedDecision[]> {
+  const sorted = [...decisions].sort((a, b) => {
+    const modifierA = learningModifiers && (a.context.job as any).id ? (learningModifiers[(a.context.job as any).id] || 0) : 0;
+    const modifierB = learningModifiers && (b.context.job as any).id ? (learningModifiers[(b.context.job as any).id] || 0) : 0;
+
+    // Priority is usually 1-100. Modifier is a percentage nudge (-0.15 to +0.15).
+    const effectivePriorityA = a.result.priority * (1 + modifierA);
+    const effectivePriorityB = b.result.priority * (1 + modifierB);
+
+    return effectivePriorityB - effectivePriorityA;
+  });
   
   const queue = sorted.map((d, index) => ({
     jobId: d.context.job.sourceUrl || `job_${index}`,
