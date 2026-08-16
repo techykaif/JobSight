@@ -7,6 +7,8 @@ import { persistCandidateJob } from '../jobs/persist.js';
 import { evaluateGeographicEligibility } from '../geographic-eligibility/evaluator.js';
 import { z } from 'zod';
 import { runDiscovery } from '../discovery/orchestrator.js';
+import { evaluateCandidateFit } from '../candidate-fit/engine.js';
+
 export async function runIngestionPipeline(runId: string, config: any, abortSignal?: AbortSignal) {
   console.log(`[RUN] Started ingestion run: ${runId}`);
 
@@ -271,9 +273,19 @@ ${chunk}
 
       // 4. Persistence
       console.log(`[PERSIST] Saving...`);
-      await persistCandidateJob(runId, normalized);
+      const { job } = await persistCandidateJob(runId, normalized);
       console.log(`[PERSIST] Success.`);
       persistedCount++;
+      
+      // 5. Candidate Fit Intelligence (D1.7.4)
+      console.log(`[CANDIDATE FIT] Evaluating...`);
+      const fitResult = await evaluateCandidateFit(runId, job.id, normalized);
+      if (fitResult) {
+        console.log(`[CANDIDATE FIT] Scored: ${fitResult.score} (${fitResult.level})`);
+      } else {
+        console.log(`[CANDIDATE FIT] Skipped: No profile snapshot available.`);
+      }
+
     } catch (error: any) {
       console.error(`[VALIDATE/PERSIST] Failed: ${error.message}`);
       failedCount++;

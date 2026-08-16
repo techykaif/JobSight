@@ -592,6 +592,19 @@ export const oppDiscoverySummary = sqliteTable('opp_discovery_summary', {
 // APPLICATION INTELLIGENCE (Phase B5)
 // ----------------------------------------------------------------------
 
+export const candidateFitResults = sqliteTable('candidate_fit_results', {
+  id: text('id').primaryKey(),
+  jobId: text('job_id').notNull().references(() => jobs.id),
+  runId: text('run_id').notNull().references(() => runs.id),
+  score: integer('score'),
+  level: text('level').notNull(),
+  dimensions: text('dimensions', { mode: 'json' }),
+  matchedSkills: text('matched_skills', { mode: 'json' }),
+  missingSkills: text('missing_skills', { mode: 'json' }),
+  reasons: text('reasons', { mode: 'json' }),
+  ...timestampFields
+});
+
 export const applicationResults = sqliteTable('application_results', {
   id: text('id').primaryKey(),
   runId: text('run_id').references(() => runs.id),
