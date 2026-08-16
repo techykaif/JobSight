@@ -1,7 +1,7 @@
-import * as pdfParseModule from 'pdf-parse';
+import { PDFParse } from 'pdf-parse';
 import mammoth from 'mammoth';
 
-export type SupportedMimeType = 
+export type SupportedMimeType =
   | 'application/pdf'
   | 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
   | 'text/plain';
@@ -28,22 +28,25 @@ export async function extractTextFromBuffer(
   try {
     switch (mimeType) {
       case 'application/pdf': {
-        const pdfParse = (pdfParseModule as any).default || pdfParseModule;
-        const data = await pdfParse(buffer);
+        const parser = new PDFParse({ data: buffer });
+        const data = await parser.getText();
+
         if (!data.text || data.text.trim() === '') {
           throw new Error('No text found in PDF. It might be an image-based PDF or corrupted.');
         }
-        
+
+        const info = await parser.getInfo();
+
         return {
           text: data.text.trim(),
           sourceType: 'PDF',
           metadata: {
-            numpages: data.numpages,
-            info: data.info
+            numpages: info.total,
+            info: info.info
           }
         };
       }
-      
+
       case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': {
         const result = await mammoth.extractRawText({ buffer });
         if (!result.value || result.value.trim() === '') {
@@ -57,7 +60,7 @@ export async function extractTextFromBuffer(
           }
         };
       }
-      
+
       case 'text/plain': {
         const text = buffer.toString('utf-8');
         if (text.trim() === '') {
@@ -68,7 +71,7 @@ export async function extractTextFromBuffer(
           sourceType: 'TXT'
         };
       }
-      
+
       default:
         throw new Error(`Unsupported mime type: ${mimeType}`);
     }

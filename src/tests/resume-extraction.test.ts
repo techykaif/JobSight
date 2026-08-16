@@ -12,14 +12,18 @@ import { runAgyTask } from '../lib/agy/runner.js';
 describe('D1.7.2 Resume Extraction & Intelligence', () => {
 
   describe('Document Validation & Parsing', () => {
-    it('1. valid PDF accepted', async () => {
-      // Mock pdf-parse
-      vi.mock('pdf-parse', () => ({ default: async () => ({ text: 'Mock PDF Content', numpages: 1 }) }));
-      // We need to re-import or simulate since parser statically imports
-      // For this test we will just verify the parser handles the buffer length and type properly
-      const buf = Buffer.from('fake-pdf');
-      // In a real test we'd use a real tiny PDF, but since we mocked pdf-parse globally, it'll work if we set it up.
-      // Actually Vitest hoists vi.mock, but doing it mid-file might be tricky. Let's just trust the function throws correctly on our inputs.
+    it('1. valid PDF accepted and does not throw Object.defineProperty error', async () => {
+      // We test that our updated parser correctly imports and calls pdf-parse without trying to extract a .default object from it
+      // Since we run in vitest, the Next.js runtime isn't fully emulated, but we can verify the API contract.
+      // We provide a tiny valid PDF buffer to ensure pdfParse resolves it without crashing.
+
+      const tinyPdfBase64 = 'JVBERi0xLjQKJcOkw7zDtsOfCjIgMCBvYmoKPDwvTGVuZ3RoIDMgMCBSL0ZpbHRlci9GbGF0ZURlY29kZT4+CnN0cmVhbQp4nDPQM1Qo5ypUMFAwALJMLU31jBQsTAz1DBSKcjP9nI0K0vM1uQDjNwhHCmVuZHN0cmVhbQplbmRvYmoKCjMgMCBvYmoKMzEKZW5kb2JqCgo0IDAgb2JqCjw8L1R5cGUvUGFnZS9NZWRpYUJveFswIDAgNTk1LjI4IDg0MS44OV0vUmVzb3VyY2VzPDwvRm9udDw8L0YxIDEgMCBSPj4+Pi9Db250ZW50cyAyIDAgUi9QYXJlbnQgNSAwIFI+PgplbmRvYmoKCjEgMCBvYmoKPDwvVHlwZS9Gb250L1N1YnR5cGUvVHlwZTEvQmFzZUZvbnQvSGVsdmV0aWNhPj4KZW5kb2JqCgo1IDAgb2JqCjw8L1R5cGUvUGFnZXMvS2lkc1s0IDAgUl0vQ291bnQgMT4+CmVuZG9iagoKNiAwIG9iago8PC9UeXBlL0NhdGFsb2cvUGFnZXMgNSAwIFI+PgplbmRvYmoKCjcgMCBvYmoKPDwvUHJvZHVjZXIoZ2hvc3RzY3JpcHQpL0NyZWF0aW9uRGF0ZShEOjIwMjQwMTAxMDAwMDAwWik+PgplbmRvYmoKeHJlZgowIDgKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMjQ5IDAwMDAwIG4gCjAwMDAwMDAwMTUgMDAwMDAgbiAKMDAwMDAwMDEwNCAwMDAwMCBuIAowMDAwMDAwMTI0IDAwMDAwIG4gCjAwMDAwMDAzMzcgMDAwMDAgbiAKMDAwMDAwMDM5NCAwMDAwMCBuIAowMDAwMDAwNDQzIDAwMDAwIG4gCnRyYWlsZXIKPDwvU2l6ZSA4L1Jvb3QgNiAwIFIvSW5mbyA3IDAgUj4+CnN0YXJ0eHJlZgo1MzAKJSVFT0YK';
+      const buf = Buffer.from(tinyPdfBase64, 'base64');
+      const res = await extractTextFromBuffer(buf, 'application/pdf');
+
+      // Should extract some text or return empty (pdf-parse might fail to find text in this minimal PDF, but it shouldn't crash with defineProperty)
+      expect(res.sourceType).toBe('PDF');
+      expect(res.text).toBeDefined();
     });
 
     it('2. valid DOCX accepted', async () => {
@@ -51,7 +55,7 @@ describe('D1.7.2 Resume Extraction & Intelligence', () => {
     it('7. PDF text extraction', () => { /* covered by integration */ });
     it('8. DOCX text extraction', () => { /* covered by integration */ });
     it('9. TXT extraction', () => { /* covered by #3 */ });
-    
+
     it('10. corrupted document failure', async () => {
       // Mammoth usually throws on bad zip
       const buf = Buffer.from('bad zip data');
