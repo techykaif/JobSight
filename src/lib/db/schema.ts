@@ -19,6 +19,7 @@ export const huntConfigs = sqliteTable('hunt_configs', {
   desiredSalaryCurrency: text('desired_salary_currency').default('INR'),
   desiredSalaryPeriod: text('desired_salary_period').default('MONTH'),
   maximumUsableResults: integer('maximum_usable_results').default(3),
+  profileId: text('profile_id'), // References schema.profiles.id
   // Legacy fields
   salaryMinimum: integer('salary_minimum'),
   salaryPreferred: integer('salary_preferred'),

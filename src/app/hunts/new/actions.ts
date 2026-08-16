@@ -25,6 +25,8 @@ export async function saveHuntConfig(formData: FormData) {
   const searchScope = formData.get('searchScope')?.toString() || 'LOCAL_AND_GLOBAL';
   const candidateCountry = formData.get('candidateCountry')?.toString() || 'India';
   const maximumUsableResults = formData.get('maximumUsableResults') ? parseInt(formData.get('maximumUsableResults')!.toString(), 10) : 3;
+  const profileIdInput = formData.get('profileId')?.toString() || null;
+  const profileId = profileIdInput === 'none' ? null : profileIdInput;
 
   const data = {
     id: configId,
@@ -39,6 +41,7 @@ export async function saveHuntConfig(formData: FormData) {
     searchScope,
     candidateCountry,
     maximumUsableResults,
+    profileId,
     
     discoveryStrategy: formData.get('discoveryStrategy')?.toString() || 'strategy_stealth',
     discoveryGroups: formData.get('discoveryGroups')?.toString().split(',').map(s => s.trim()).filter(Boolean) || [],
@@ -50,15 +53,54 @@ export async function saveHuntConfig(formData: FormData) {
     updatedAt: new Date().toISOString()
   };
 
+  let profileSnapshot = null;
+  
+  if (profileId) {
+    const { getCurrentUserId } = await import('@/lib/auth');
+    const userId = await getCurrentUserId();
+    
+    // Load and validate ownership
+    const { eq, and } = await import('drizzle-orm');
+    const profileRecords = await db.select()
+      .from(schema.profiles)
+      .where(and(eq(schema.profiles.id, profileId), eq(schema.profiles.userId, userId)))
+      .limit(1);
+      
+    if (!profileRecords[0]) {
+      throw new Error('Unauthorized or missing profile');
+    }
+    
+    const profile = profileRecords[0];
+    profileSnapshot = {
+      profileId: profile.id,
+      profileName: profile.name,
+      snapshotAt: new Date().toISOString(),
+      profile: {
+        yearsOfProfessionalExperience: profile.yearsOfProfessionalExperience,
+        education: profile.education,
+        targetRoles: profile.targetRoles,
+        skills: profile.skills,
+        projectExperience: profile.projectExperience,
+        preferredRoles: profile.preferredRoles,
+        salaryExpectations: profile.salaryExpectations,
+        remotePreference: profile.remotePreference,
+        allowedRegions: profile.allowedRegions,
+        employmentPreferences: profile.employmentPreferences
+      }
+    };
+  }
+
+  // Use a transaction to ensure atomicity
+  const runId = crypto.randomUUID();
+  
   await db.insert(schema.huntConfigs).values(data);
   
-  // Create a run in CREATED state as specified in M7 (Option A)
-  const runId = crypto.randomUUID();
   await db.insert(schema.runs).values({
     id: runId,
     configId,
     status: 'CREATED',
     currentStage: 'PENDING_START',
+    profileSnapshot,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   });

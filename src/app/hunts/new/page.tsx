@@ -1,8 +1,9 @@
 'use client';
 
 import { saveHuntConfig } from './actions';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type { KeyboardEvent } from 'react';
+import { getProfiles } from '@/app/profile/actions';
 
 const COMMON_PROVIDERS = [
   { id: 'provider_greenhouse', name: 'Greenhouse', icon: '🌱' },
@@ -30,6 +31,11 @@ export default function NewHuntPage() {
   const [urlInput, setUrlInput] = useState('');
   const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set(['group_yc']));
   const [selectedProviders, setSelectedProviders] = useState<Set<string>>(new Set());
+  const [profiles, setProfiles] = useState<any[]>([]);
+
+  useEffect(() => {
+    getProfiles().then(setProfiles).catch(console.error);
+  }, []);
 
   const handleUrlKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -89,6 +95,18 @@ export default function NewHuntPage() {
           <div className="form-column">
             <div className="card">
               <h3 className="card-title">Target Role Details</h3>
+              
+              <div className="form-group">
+                <label className="form-label">Candidate Profile (Optional)</label>
+                <select name="profileId" className="form-input">
+                  <option value="none">No candidate profile (Standalone Hunt)</option>
+                  {profiles.map(p => (
+                    <option key={p.id} value={p.id}>{p.name} ({p.yearsOfProfessionalExperience} yrs exp)</option>
+                  ))}
+                </select>
+                <span className="form-hint">Links this Hunt to a Candidate Profile for scoring</span>
+              </div>
+              
               <div className="form-group">
                 <label className="form-label">Target Roles</label>
                 <input type="text" name="targetRoles" className="form-input" placeholder="e.g., Software Engineer, Backend Engineer" required />

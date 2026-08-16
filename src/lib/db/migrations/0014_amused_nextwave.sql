@@ -1,0 +1,1 @@
+ALTER TABLE `hunt_configs` ADD `profile_id` text;
