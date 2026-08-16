@@ -70,12 +70,14 @@ export default function ResumeImporter() {
       setInputValue('skills', allSkills.join(', '));
     }
 
-    if (extracted.experience?.roles?.length || extracted.experience?.notableResponsibilities?.length) {
+    if (extracted.projects?.projectSkills?.length || extracted.projects?.portfolioProjects?.length) {
       const projExp = [
-        ...(extracted.experience.roles || []),
-        ...(extracted.experience.notableResponsibilities || [])
+        ...(extracted.projects.portfolioProjects || []),
+        ...(extracted.projects.projectSkills || [])
       ];
       setInputValue('projectExperience', projExp.join(', '));
+    } else {
+      setInputValue('projectExperience', '');
     }
     
     alert('Profile data applied to the form. Please review and click "Save Profile".');
@@ -120,7 +122,10 @@ export default function ResumeImporter() {
             <p><strong>Years of Exp:</strong> {extracted.experience?.yearsOfProfessionalExperience ?? 'Unknown'}</p>
             <p><strong>Target Roles:</strong> {extracted.target?.targetRoles?.join(', ') || 'None found'}</p>
             <p><strong>Education:</strong> {extracted.education?.degrees?.join(', ') || 'None found'}</p>
-            <p><strong>Top Skills:</strong> {extracted.skills?.programmingLanguages?.join(', ')} {extracted.skills?.frameworks?.join(', ')}</p>
+            <p><strong>Top Skills:</strong> {[
+              ...(extracted.skills?.programmingLanguages || []),
+              ...(extracted.skills?.frameworks || [])
+            ].join(', ') || 'None found'}</p>
           </div>
           
           <div style={{ marginTop: '1rem' }}>

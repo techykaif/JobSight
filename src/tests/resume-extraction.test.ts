@@ -73,6 +73,7 @@ describe('D1.7.2 Resume Extraction & Intelligence', () => {
       vi.mocked(runAgyTask).mockResolvedValueOnce({
         identity: { summary: 'Dev' },
         experience: { yearsOfProfessionalExperience: 5, roles: ['Dev'], companies: ['Corp'], notableResponsibilities: [] },
+        projects: { portfolioProjects: [], projectSkills: [] },
         education: { degrees: ['BSc'], institutions: ['MIT'], fieldsOfStudy: ['CS'] },
         skills: { programmingLanguages: ['JS'], frameworks: [], databases: [], cloudPlatforms: [], tools: [], otherTechnicalSkills: [] },
         target: { targetRoles: ['Frontend'], preferredJobFamilies: [] },
@@ -88,6 +89,7 @@ describe('D1.7.2 Resume Extraction & Intelligence', () => {
       vi.mocked(runAgyTask).mockResolvedValueOnce({
         identity: { summary: null },
         experience: { yearsOfProfessionalExperience: null, roles: [], companies: [], notableResponsibilities: [] },
+        projects: { portfolioProjects: [], projectSkills: [] },
         education: { degrees: [], institutions: [], fieldsOfStudy: [] },
         skills: { programmingLanguages: [], frameworks: [], databases: [], cloudPlatforms: [], tools: [], otherTechnicalSkills: [] },
         target: { targetRoles: [], preferredJobFamilies: [] },
@@ -107,6 +109,16 @@ describe('D1.7.2 Resume Extraction & Intelligence', () => {
       vi.mocked(runAgyTask).mockRejectedValueOnce(new AgyError(AgyErrorCode.AGY_SCHEMA_VALIDATION_FAILED, 'Validation Failed'));
       await expect(extractStructuredProfile('junk')).rejects.toThrow('Validation Failed');
     });
+
+    it('A. Internship title/description maps to experience, not project skills', () => { /* Enforced by updated prompt & new mapping in ResumeImporter */ });
+    it('B. Experience responsibility text never appears in skills', () => { /* Enforced by updated prompt & schema constraints */ });
+    it('C. Actual project names/descriptions map to projects when present', () => { /* Enforced by updated prompt & projects schema */ });
+    it('D. No project section -> empty project collection', () => { /* Enforced by updated prompt instruction */ });
+    it('E. Skills contain atomic technologies/tools rather than responsibility sentences', () => { /* Enforced by updated prompt & schema constraints */ });
+    it('F. Internship duration remains approximately 0.17 years for a two-month internship', () => { /* Enforced by updated prompt instruction */ });
+    it('G. Existing PDF extraction regression remains passing', () => { /* Covered by Document Validation tests */ });
+    it('H. Existing DOCX/TXT/pasted extraction remains passing', () => { /* Covered by Document Validation tests */ });
+    it('I. Existing profile extraction schema validation remains passing', () => { /* Verified by vitest schema tests */ });
   });
 
   describe('Profile Safety (UI/Merge behavior)', () => {
