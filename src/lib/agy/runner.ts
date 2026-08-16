@@ -10,6 +10,8 @@ export interface RunAgyTaskOptions<T extends z.ZodType> {
   maxAttempts?: number;
   dangerouslySkipPermissions?: boolean;
   abortSignal?: AbortSignal;
+  model?: string;
+  effort?: 'low' | 'medium' | 'high';
 }
 
 export async function checkAgyAvailability(): Promise<boolean> {
@@ -35,13 +37,18 @@ export async function runAgyTask<T extends z.ZodType>(
     }
   }
 
-  console.log(`[WORKER] Attempt ${attempt}/${maxAttempts}`);
+  const agyModel = options.model ?? 'gemini-3.7-flash';
+  const agyEffort = options.effort ?? 'high';
+
+  console.log(`[WORKER] Attempt ${attempt}/${maxAttempts} (Model: ${agyModel}, Effort: ${agyEffort})`);
 
   try {
     const args = [
       '-p', options.prompt,
       '--output-format', 'json',
-      '--json-schema', JSON.stringify(options.jsonSchemaDef)
+      '--json-schema', JSON.stringify(options.jsonSchemaDef),
+      '--model', agyModel,
+      '--effort', agyEffort
     ];
 
     if (options.dangerouslySkipPermissions) {
@@ -114,6 +121,8 @@ export interface RunAgyUnstructuredOptions {
   maxAttempts?: number;
   dangerouslySkipPermissions?: boolean;
   abortSignal?: AbortSignal;
+  model?: string;
+  effort?: 'low' | 'medium' | 'high';
 }
 
 export async function runAgyUnstructured(options: RunAgyUnstructuredOptions): Promise<string> {
@@ -121,10 +130,17 @@ export async function runAgyUnstructured(options: RunAgyUnstructuredOptions): Pr
   const timeoutMs = options.timeoutMs ?? 120000;
   let attempt = 1;
 
+  const agyModel = options.model ?? 'gemini-3.7-flash';
+  const agyEffort = options.effort ?? 'high';
+
   while (attempt <= maxAttempts) {
-    console.log(`[WORKER_UNSTRUCTURED] Attempt ${attempt}/${maxAttempts}`);
+    console.log(`[WORKER_UNSTRUCTURED] Attempt ${attempt}/${maxAttempts} (Model: ${agyModel}, Effort: ${agyEffort})`);
     try {
-      const args = ['-p', options.prompt];
+      const args = [
+        '-p', options.prompt,
+        '--model', agyModel,
+        '--effort', agyEffort
+      ];
       if (options.dangerouslySkipPermissions) {
         args.push('--dangerously-skip-permissions');
       }

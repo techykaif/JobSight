@@ -3,8 +3,10 @@ import * as schema from '../lib/db/schema.js';
 import { eq } from 'drizzle-orm';
 import crypto from 'crypto';
 import { runMission } from '../lib/pipeline/orchestrator.js';
+import { bootstrap } from '../lib/bootstrap.js';
 
 async function main() {
+  await bootstrap();
   console.log("Starting M8 Bounded Real Mission...");
 
   // 1. Create Profile
