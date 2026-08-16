@@ -28,6 +28,8 @@ export interface JobCardProps {
   companyOpportunity?: string | undefined;
   /** Decision confidence 0–100 from decisionResults */
   confidence?: number | undefined;
+  /** Geographic eligibility from B6 candidateRemoteEligibility */
+  eligibility?: string | undefined;
   // ────────────────────────────────────────────────────────────────
   onClick?: (() => void) | undefined;
   className?: string | undefined;
@@ -92,6 +94,7 @@ export const JobCard: React.FC<JobCardProps> = ({
   readiness,
   companyOpportunity,
   confidence,
+  eligibility,
   onClick,
   className = '',
 }) => {
@@ -169,7 +172,20 @@ export const JobCard: React.FC<JobCardProps> = ({
         {remote && (
           <div onClick={stop}>
             <Link href="/jobs?remote=REMOTE" style={{ textDecoration: 'none' }}>
-              <StatusBadge status="Remote" variant="info" />
+              <StatusBadge
+                status={
+                  eligibility === 'ELIGIBLE' ? 'Remote (Eligible)' :
+                  eligibility === 'NOT_ELIGIBLE' ? 'Not Eligible' :
+                  eligibility === 'UNKNOWN' ? 'Remote (Unknown)' :
+                  'Remote'
+                }
+                variant={
+                  eligibility === 'ELIGIBLE' ? 'success' :
+                  eligibility === 'NOT_ELIGIBLE' ? 'danger' :
+                  eligibility === 'UNKNOWN' ? 'warning' :
+                  'info'
+                }
+              />
             </Link>
           </div>
         )}

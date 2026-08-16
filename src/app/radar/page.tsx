@@ -1,6 +1,6 @@
 import { db } from '@/lib/db/client';
 import * as schema from '@/lib/db/schema';
-import { desc, eq, sql, or, like } from 'drizzle-orm';
+import { desc, eq, sql, or, like, inArray } from 'drizzle-orm';
 import styles from './radar.module.css';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { JobCard } from '@/components/ui/JobCard';
@@ -26,12 +26,13 @@ export default async function DiscoveryRadarPage() {
       id: schema.jobs.id,
       canonicalTitle: schema.jobs.canonicalTitle,
       normalizedTitle: schema.jobs.normalizedTitle,
-      location: schema.jobs.location,
       salaryMin: schema.jobs.salaryMin,
       salaryMax: schema.jobs.salaryMax,
       salaryCurrency: schema.jobs.salaryCurrency,
       remoteType: schema.jobs.remoteType,
       companyName: schema.companies.displayName,
+      companyId: schema.jobs.companyId,
+      candidateRemoteEligibility: schema.jobs.candidateRemoteEligibility,
     })
     .from(schema.jobs)
     .innerJoin(schema.discoveryIntelligence, eq(schema.jobs.id, schema.discoveryIntelligence.jobId))
@@ -50,6 +51,8 @@ export default async function DiscoveryRadarPage() {
       salaryCurrency: schema.jobs.salaryCurrency,
       remoteType: schema.jobs.remoteType,
       companyName: schema.companies.displayName,
+      companyId: schema.jobs.companyId,
+      candidateRemoteEligibility: schema.jobs.candidateRemoteEligibility,
     })
     .from(schema.jobs)
     .leftJoin(schema.companies, eq(schema.jobs.companyId, schema.companies.id))
@@ -67,6 +70,8 @@ export default async function DiscoveryRadarPage() {
       salaryCurrency: schema.jobs.salaryCurrency,
       remoteType: schema.jobs.remoteType,
       companyName: schema.companies.displayName,
+      companyId: schema.jobs.companyId,
+      candidateRemoteEligibility: schema.jobs.candidateRemoteEligibility,
     })
     .from(schema.jobs)
     .innerJoin(schema.companyAnalysis, eq(schema.jobs.companyId, schema.companyAnalysis.companyId))
@@ -85,6 +90,8 @@ export default async function DiscoveryRadarPage() {
       salaryCurrency: schema.jobs.salaryCurrency,
       remoteType: schema.jobs.remoteType,
       companyName: schema.companies.displayName,
+      companyId: schema.jobs.companyId,
+      candidateRemoteEligibility: schema.jobs.candidateRemoteEligibility,
     })
     .from(schema.jobs)
     .leftJoin(schema.companies, eq(schema.jobs.companyId, schema.companies.id))
@@ -102,6 +109,8 @@ export default async function DiscoveryRadarPage() {
       salaryCurrency: schema.jobs.salaryCurrency,
       remoteType: schema.jobs.remoteType,
       companyName: schema.companies.displayName,
+      companyId: schema.jobs.companyId,
+      candidateRemoteEligibility: schema.jobs.candidateRemoteEligibility,
     })
     .from(schema.jobs)
     .leftJoin(schema.companies, eq(schema.jobs.companyId, schema.companies.id))
@@ -119,6 +128,8 @@ export default async function DiscoveryRadarPage() {
       salaryCurrency: schema.jobs.salaryCurrency,
       remoteType: schema.jobs.remoteType,
       companyName: schema.companies.displayName,
+      companyId: schema.jobs.companyId,
+      candidateRemoteEligibility: schema.jobs.candidateRemoteEligibility,
     })
     .from(schema.jobs)
     .leftJoin(schema.companies, eq(schema.jobs.companyId, schema.companies.id))
@@ -136,6 +147,8 @@ export default async function DiscoveryRadarPage() {
       salaryCurrency: schema.jobs.salaryCurrency,
       remoteType: schema.jobs.remoteType,
       companyName: schema.companies.displayName,
+      companyId: schema.jobs.companyId,
+      candidateRemoteEligibility: schema.jobs.candidateRemoteEligibility,
     })
     .from(schema.jobs)
     .innerJoin(schema.companyAnalysis, eq(schema.jobs.companyId, schema.companyAnalysis.companyId))
@@ -154,6 +167,8 @@ export default async function DiscoveryRadarPage() {
       salaryCurrency: schema.jobs.salaryCurrency,
       remoteType: schema.jobs.remoteType,
       companyName: schema.companies.displayName,
+      companyId: schema.jobs.companyId,
+      candidateRemoteEligibility: schema.jobs.candidateRemoteEligibility,
       opportunityScore: schema.opportunityIntelligence.opportunityScore,
     })
     .from(schema.jobs)
@@ -174,6 +189,63 @@ export default async function DiscoveryRadarPage() {
   ];
 
   const totalOpportunities = sections.reduce((sum, s) => sum + s.data.length, 0);
+
+  // ── D1.5 Batched Intelligence Loading ───────────────────────────────────────────
+  const allJobs = sections.flatMap(s => s.data);
+  const jobIds = [...new Set(allJobs.map(j => j.id))];
+  const companyIds = [...new Set(allJobs.map(j => j.companyId).filter((id): id is string => !!id))];
+
+  function chunk<T>(arr: T[], size = 100): T[][] {
+    const out: T[][] = [];
+    for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+    return out;
+  }
+
+  function latestByKey<T extends { createdAt: string }>(rows: T[], keyOf: (row: T) => string): Map<string, T> {
+    const out = new Map<string, T>();
+    for (const row of rows) {
+      const key = keyOf(row);
+      const existing = out.get(key);
+      if (!existing || row.createdAt > existing.createdAt) out.set(key, row);
+    }
+    return out;
+  }
+
+  const competitionRows: (typeof schema.competitionResults.$inferSelect)[] = [];
+  const applicationRows: (typeof schema.applicationResults.$inferSelect)[] = [];
+  const decisionResultRows: (typeof schema.decisionResults.$inferSelect)[] = [];
+  const discoveryRows: (typeof schema.discoveryIntelligence.$inferSelect)[] = [];
+
+  for (const idChunk of chunk(jobIds)) {
+    if (idChunk.length === 0) continue;
+    competitionRows.push(...await db.select().from(schema.competitionResults).where(inArray(schema.competitionResults.jobId, idChunk)));
+    applicationRows.push(...await db.select().from(schema.applicationResults).where(inArray(schema.applicationResults.jobId, idChunk)));
+    decisionResultRows.push(...await db.select().from(schema.decisionResults).where(inArray(schema.decisionResults.jobId, idChunk)));
+    discoveryRows.push(...await db.select().from(schema.discoveryIntelligence).where(inArray(schema.discoveryIntelligence.jobId, idChunk)));
+  }
+
+  const companyOpportunityRows: (typeof schema.companyOpportunity.$inferSelect)[] = [];
+  for (const idChunk of chunk(companyIds)) {
+    if (idChunk.length === 0) continue;
+    companyOpportunityRows.push(...await db.select().from(schema.companyOpportunity).where(inArray(schema.companyOpportunity.companyId, idChunk)));
+  }
+
+  const competitionByJobId = latestByKey(competitionRows, r => r.jobId);
+  const applicationByJobId = latestByKey(applicationRows, r => r.jobId);
+  const decisionConfidenceByJobId = latestByKey(decisionResultRows, r => r.jobId);
+  const companyOpportunityByCompanyId = latestByKey(companyOpportunityRows, r => r.companyId);
+  const discoveryByJobId = latestByKey(discoveryRows, r => r.jobId);
+
+  // Preserve B7 ranking order if prioritizing nudged elements within the radar section limits
+  for (const section of sections) {
+    section.data.sort((a, b) => {
+      const pA = Number(decisionConfidenceByJobId.get(a.id)?.priority || 0);
+      const pB = Number(decisionConfidenceByJobId.get(b.id)?.priority || 0);
+      if (pA === 0 && pB === 0) return 0;
+      return pB - pA;
+    });
+  }
+  // ────────────────────────────────────────────────────────────────────────────────
 
   return (
     <div className={styles.container}>
@@ -203,18 +275,30 @@ export default async function DiscoveryRadarPage() {
 
           {section.data.length > 0 ? (
             <div className={styles.grid}>
-              {section.data.map(job => (
-                <JobCard
-                  key={job.id}
-                  id={job.id}
-                  title={job.canonicalTitle || job.normalizedTitle || 'Unknown Role'}
-                  company={job.companyName || 'Unknown Company'}
-                  salaryMin={job.salaryMin ?? undefined}
-                  salaryMax={job.salaryMax ?? undefined}
-                  remote={job.remoteType === 'REMOTE' || job.remoteType === 'FULLY_REMOTE'}
-                  score={(job as any).opportunityScore ?? undefined}
-                />
-              ))}
+              {section.data.map(job => {
+                const comp = competitionByJobId.get(job.id)?.level || discoveryByJobId.get(job.id)?.competition;
+                const readiness = applicationByJobId.get(job.id)?.readinessLevel;
+                const companyOpp = companyOpportunityByCompanyId.get(job.companyId!)?.level;
+                const confidence = decisionConfidenceByJobId.get(job.id)?.confidence;
+
+                return (
+                  <JobCard
+                    key={job.id}
+                    id={job.id}
+                    title={job.canonicalTitle || job.normalizedTitle || 'Unknown Role'}
+                    company={job.companyName || 'Unknown Company'}
+                    salaryMin={job.salaryMin ?? undefined}
+                    salaryMax={job.salaryMax ?? undefined}
+                    remote={job.remoteType === 'REMOTE' || job.remoteType === 'FULLY_REMOTE'}
+                    score={(job as any).opportunityScore ?? undefined}
+                    competition={comp ?? undefined}
+                    readiness={readiness ?? undefined}
+                    companyOpportunity={companyOpp ?? undefined}
+                    confidence={confidence ?? undefined}
+                    eligibility={job.candidateRemoteEligibility ?? undefined}
+                  />
+                );
+              })}
             </div>
           ) : (
             <EmptyState message={section.emptyMsg} icon={section.emptyIcon} />
