@@ -85,6 +85,13 @@
       "when": 1786904631834,
       "tag": "0011_sturdy_thunderball",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1786911258437,
+      "tag": "0012_skinny_archangel",
+      "breakpoints": true
     }
   ]
 }

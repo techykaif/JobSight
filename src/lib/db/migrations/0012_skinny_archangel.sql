@@ -1,0 +1,1 @@
+ALTER TABLE `profiles` ADD `user_id` text DEFAULT 'local_user' NOT NULL;

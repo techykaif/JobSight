@@ -223,6 +223,7 @@ export const decisions = sqliteTable('decisions', {
 
 export const profiles = sqliteTable('profiles', {
   id: text('id').primaryKey(),
+  userId: text('user_id').notNull().default('local_user'),
   name: text('name').notNull(),
   yearsOfProfessionalExperience: integer('years_of_professional_experience').notNull(),
   education: text('education'),
