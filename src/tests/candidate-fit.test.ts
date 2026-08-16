@@ -226,13 +226,13 @@ describe('D1.7.4 Candidate Fit Intelligence', () => {
       await evaluateCandidateFit(runId, 'job-idem-1', job);
       let results = await db.select().from(schema.candidateFitResults).where(eq(schema.candidateFitResults.runId, runId)).all();
       expect(results.length).toBe(1);
-      const firstId = results[0].id;
+      const firstId = results[0]!.id;
 
       // Second run (same runId, same jobId)
       await evaluateCandidateFit(runId, 'job-idem-1', job);
       results = await db.select().from(schema.candidateFitResults).where(eq(schema.candidateFitResults.runId, runId)).all();
       expect(results.length).toBe(1); // STILL 1
-      expect(results[0].id).toBe(firstId); // REUSED ROW
+      expect(results[0]!.id).toBe(firstId); // REUSED ROW
     });
 
     it('4. Same job across different runs produces different rows', async () => {

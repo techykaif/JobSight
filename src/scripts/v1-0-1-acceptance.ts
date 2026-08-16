@@ -21,6 +21,7 @@ async function main() {
   const profileId = crypto.randomUUID();
   await db.insert(schema.profiles).values({
     id: profileId,
+    userId: 'system_test',
     name: "V1.0.1-A Acceptance Candidate",
     yearsOfProfessionalExperience: 5,
     targetRoles: ["Software Engineer", "Full Stack Developer", "Backend Developer", "Automation Engineer"],

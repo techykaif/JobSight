@@ -4,6 +4,7 @@ import { saveHuntConfig } from './actions';
 import { useState, useRef, useEffect } from 'react';
 import type { KeyboardEvent } from 'react';
 import { getProfiles } from '@/app/profile/actions';
+import { ProfileModal } from '@/components/profile/ProfileModal';
 
 const COMMON_PROVIDERS = [
   { id: 'provider_greenhouse', name: 'Greenhouse', icon: '🌱' },
@@ -32,9 +33,15 @@ export default function NewHuntPage() {
   const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set(['group_yc']));
   const [selectedProviders, setSelectedProviders] = useState<Set<string>>(new Set());
   const [profiles, setProfiles] = useState<any[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedProfileId, setSelectedProfileId] = useState<string>('none');
+
+  const fetchProfiles = () => {
+    getProfiles().then(setProfiles).catch(console.error);
+  };
 
   useEffect(() => {
-    getProfiles().then(setProfiles).catch(console.error);
+    fetchProfiles();
   }, []);
 
   const handleUrlKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -98,12 +105,28 @@ export default function NewHuntPage() {
               
               <div className="form-group">
                 <label className="form-label">Candidate Profile (Optional)</label>
-                <select name="profileId" className="form-input">
-                  <option value="none">No candidate profile (Standalone Hunt)</option>
-                  {profiles.map(p => (
-                    <option key={p.id} value={p.id}>{p.name} ({p.yearsOfProfessionalExperience} yrs exp)</option>
-                  ))}
-                </select>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                  <select 
+                    name="profileId" 
+                    className="form-input" 
+                    style={{ flex: 1 }}
+                    value={selectedProfileId}
+                    onChange={(e) => setSelectedProfileId(e.target.value)}
+                  >
+                    <option value="none">No candidate profile (Standalone Hunt)</option>
+                    {profiles.map(p => (
+                      <option key={p.id} value={p.id}>{p.name} ({p.yearsOfProfessionalExperience} yrs exp)</option>
+                    ))}
+                  </select>
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary" 
+                    onClick={() => setIsModalOpen(true)}
+                    style={{ whiteSpace: 'nowrap' }}
+                  >
+                    + Create Profile
+                  </button>
+                </div>
                 <span className="form-hint">Links this Hunt to a Candidate Profile for scoring</span>
               </div>
               
@@ -293,6 +316,12 @@ export default function NewHuntPage() {
           </button>
         </div>
       </form>
+
+      <ProfileModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        onSaved={fetchProfiles} 
+      />
     </div>
   );
 }

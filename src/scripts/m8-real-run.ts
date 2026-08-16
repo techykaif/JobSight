@@ -13,6 +13,7 @@ async function main() {
   const profileId = crypto.randomUUID();
   await db.insert(schema.profiles).values({
     id: profileId,
+    userId: 'system_test',
     name: "M8 Verification User",
     yearsOfProfessionalExperience: 5,
     targetRoles: ["Frontend Engineer"],

@@ -86,7 +86,7 @@ metrics/
 ############################
 # Local User Profile
 ############################
-profile/
+/profile/
 candidate-profile.json
 resume.pdf
 resume.docx
