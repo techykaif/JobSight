@@ -121,7 +121,7 @@ export async function persistCandidateJob(runId: string, candidate: CandidateJob
       candidateRemoteEligibility: candidate.job.candidateRemoteEligibility,
       experienceMin: candidate.experience?.minYears,
       experienceMax: candidate.experience?.maxYears,
-      description: candidate.description.summary,
+      description: candidate.description?.summary,
       status: candidate.job.status,
       firstSeenAt: now,
       lastSeenAt: now,
@@ -157,8 +157,8 @@ export async function persistCandidateJob(runId: string, candidate: CandidateJob
     location: candidate.job.location,
     remoteType: candidate.job.remoteType,
     rawMetadata: JSON.stringify({
-      requiredSkills: candidate.description.requiredSkills,
-      preferredSkills: candidate.description.preferredSkills
+      requiredSkills: candidate.description?.requiredSkills,
+      preferredSkills: candidate.description?.preferredSkills
     })
   });
 

@@ -50,7 +50,7 @@ export const CandidateJobSchema = z.object({
     summary: z.string().nullable().optional(),
     requiredSkills: z.array(z.string()).nullable().optional(),
     preferredSkills: z.array(z.string()).nullable().optional()
-  }),
+  }).nullable().optional(),
   sources: z.array(CandidateSourceSchema).nullable().optional(),
   evidence: z.array(CandidateEvidenceSchema).nullable().optional(),
   unknownFields: z.array(z.string()).nullable().optional()

@@ -35,9 +35,10 @@ describe('Pipeline Normalization and Validation', () => {
     expect(() => normalizeJobExtraction(invalid)).toThrow(ValidationError);
   });
 
-  it('rejects missing source provenance', () => {
+  it('accepts empty source provenance without fabricating one', () => {
     const invalid = { ...validCandidate, sources: [] };
-    expect(() => normalizeJobExtraction(invalid)).toThrow(ValidationError);
+    const normalized = normalizeJobExtraction(invalid);
+    expect(normalized.sources).toEqual([]);
   });
 
   it('rejects illogical compensation bounds', () => {

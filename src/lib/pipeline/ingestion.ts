@@ -1,13 +1,14 @@
 import crypto from 'crypto';
 import { runAgyTask, runAgyUnstructured } from '../agy/runner.js';
 import * as repos from '../db/repositories/index.js';
-import { StructuringOutputSchema, EXTERNAL_AGY_STRUCTURING_CONTRACT } from '../jobs/extractionSchema.js';
+import { StructuringOutputSchema, EXTERNAL_AGY_STRUCTURING_CONTRACT, CandidateJobSchema } from '../jobs/extractionSchema.js';
 import { normalizeJobExtraction, ValidationError } from '../jobs/normalize.js';
 import { persistCandidateJob } from '../jobs/persist.js';
+import { z } from 'zod';
 import { runDiscovery } from '../discovery/orchestrator.js';
 export async function runIngestionPipeline(runId: string, config: any, abortSignal?: AbortSignal) {
   console.log(`[RUN] Started ingestion run: ${runId}`);
-  
+
   // 1. Stage A: RETRIEVAL
   console.log(`[RETRIEVAL] Starting AGY Stage A (Unstructured)`);
   const candidateCountry = config.candidateCountry || 'India';
@@ -67,11 +68,11 @@ export async function runIngestionPipeline(runId: string, config: any, abortSign
 
   let structuredData = { candidates: [] as any[] };
   const stageBStartTime = Date.now();
-  
+
   try {
     const chunks = chunkMarkdown(rawResearch, 6000);
     console.log(`[STRUCTURE] Split raw research into ${chunks.length} chunks`);
-    
+
     const MAX_STAGE_B_CONCURRENCY = 2;
     let activeAgyProcesses = 0;
     let peakAgyProcesses = 0;
@@ -87,7 +88,7 @@ export async function runIngestionPipeline(runId: string, config: any, abortSign
       activeAgyProcesses++;
       if (activeAgyProcesses > peakAgyProcesses) peakAgyProcesses = activeAgyProcesses;
       const start = Date.now();
-      
+
       const structurePrompt = `
 YOU ARE NOT RESEARCHING.
 Use ONLY the supplied research material below.
@@ -103,11 +104,11 @@ Research Material:
 ${chunk}
 """
       `;
-      
+
       try {
         const res = await runAgyTask({
           prompt: structurePrompt,
-          schema: StructuringOutputSchema,
+          schema: z.object({ candidates: z.array(z.any()) }),
           jsonSchemaDef: EXTERNAL_AGY_STRUCTURING_CONTRACT,
           timeoutMs: 60000,
           maxAttempts: 2,
@@ -156,12 +157,12 @@ ${chunk}
       },
       sources: [{ url: dj.sourceUrl }]
     }));
-    
+
     structuredData.candidates.push(...mappedDiscovered);
 
     const stageBDuration = Date.now() - stageBStartTime;
     console.log(`[STRUCTURE] Completed structuring ${structuredData.candidates.length} candidates in ${stageBDuration}ms.`);
-    
+
     const averageChunkLatency = chunkLatencies.length > 0 ? chunkLatencies.reduce((a,b)=>a+b,0) / chunkLatencies.length : 0;
 
     await repos.saveEvent({
@@ -189,7 +190,7 @@ ${chunk}
   } catch (error: any) {
     const stageBDuration = Date.now() - stageBStartTime;
     console.error(`[STRUCTURE] Failed: ${error.message} (after ${stageBDuration}ms)`);
-    
+
     await repos.saveEvent({
       id: crypto.randomUUID(),
       runId,
@@ -214,7 +215,7 @@ ${chunk}
       retryable: false,
       createdAt: new Date().toISOString()
     });
-    return { discovered: 1, structured: 0, valid: 0, persisted: 0, failed: 1 };
+    return { discovered: discoveredJobs.length, structured: 0, valid: 0, persisted: 0, failed: 1 };
   }
 
   // 4. Normalization & Persistence Loop
@@ -223,14 +224,37 @@ ${chunk}
   let failedCount = 0;
 
   for (let i = 0; i < structuredData.candidates.length; i++) {
-    const candidate = structuredData.candidates[i];
-    if (!candidate) continue;
+    let candidateRaw = structuredData.candidates[i];
+    if (!candidateRaw) continue;
+
     console.log(`\n[VALIDATE] Candidate ${i + 1}/${structuredData.candidates.length}`);
     try {
+      // 1. Candidate-level Zod Validation
+      const validationResult = CandidateJobSchema.safeParse(candidateRaw);
+      if (!validationResult.success) {
+        throw new ValidationError(`Candidate Schema Validation Failed: ${validationResult.error.message}`);
+      }
+      const candidate = validationResult.data;
+
+      // 2. Provenance Recovery
+      if (!candidate.sources || candidate.sources.length === 0) {
+         if (candidate.job.url) {
+            const stageAJob = discoveredJobs.find(dj => dj.sourceUrl === candidate.job.url);
+            if (stageAJob && stageAJob.sourceUrl) {
+                candidate.sources = [{ url: stageAJob.sourceUrl, type: (stageAJob as any).sourceProvider || 'OTHER' }];
+            }
+         }
+      }
+
+      // If sources is STILL empty here, the normalizer will skip it (since it's not required in our schema)
+      // or we can just leave it empty. We removed the normalizer throw, so it will persist as UNKNOWN.
+
+      // 3. Normalization
       const normalized = normalizeJobExtraction(candidate);
       console.log(`[VALIDATE] PASS: ${normalized.company.name} - ${normalized.job.title}`);
       validCount++;
 
+      // 4. Persistence
       console.log(`[PERSIST] Saving...`);
       await persistCandidateJob(runId, normalized);
       console.log(`[PERSIST] Success.`);
@@ -252,7 +276,7 @@ ${chunk}
   }
 
   return {
-    discovered: structuredData.candidates.length,
+    discovered: discoveredJobs.length,
     structured: structuredData.candidates.length,
     valid: validCount,
     persisted: persistedCount,

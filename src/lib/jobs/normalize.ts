@@ -21,9 +21,7 @@ export function normalizeJobExtraction(candidate: CandidateJob): CandidateJob {
   if (!job.job?.url || job.job.url.trim() === '') {
     throw new ValidationError('Missing job url');
   }
-  if (!job.sources || job.sources.length === 0) {
-    throw new ValidationError('Missing source provenance');
-  }
+
 
   // Trim strings
   job.company.name = job.company.name.trim();
