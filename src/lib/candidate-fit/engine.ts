@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { db } from '../db/client.js';
 import * as schema from '../db/schema.js';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import type { CandidateJob } from '../jobs/extractionSchema.js';
 
 export interface CandidateFitSignal {
@@ -137,20 +137,36 @@ export async function evaluateCandidateFit(
     reasons
   };
 
-  // Persist the signal
-  await db.insert(schema.candidateFitResults).values({
-    id: crypto.randomUUID(),
-    runId,
-    jobId,
-    score: signal.score,
-    level: signal.level,
-    dimensions: JSON.stringify(signal.dimensions),
-    matchedSkills: JSON.stringify(signal.matchedSkills),
-    missingSkills: JSON.stringify(signal.missingSkills),
-    reasons: JSON.stringify(signal.reasons),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  });
+  // Persist the signal idempotently
+  const existing = await db.select().from(schema.candidateFitResults)
+    .where(and(eq(schema.candidateFitResults.runId, runId), eq(schema.candidateFitResults.jobId, jobId)))
+    .limit(1).get();
+
+  if (existing) {
+    await db.update(schema.candidateFitResults).set({
+      score: signal.score,
+      level: signal.level,
+      dimensions: JSON.stringify(signal.dimensions),
+      matchedSkills: JSON.stringify(signal.matchedSkills),
+      missingSkills: JSON.stringify(signal.missingSkills),
+      reasons: JSON.stringify(signal.reasons),
+      updatedAt: new Date().toISOString()
+    }).where(eq(schema.candidateFitResults.id, existing.id)).run();
+  } else {
+    await db.insert(schema.candidateFitResults).values({
+      id: crypto.randomUUID(),
+      runId,
+      jobId,
+      score: signal.score,
+      level: signal.level,
+      dimensions: JSON.stringify(signal.dimensions),
+      matchedSkills: JSON.stringify(signal.matchedSkills),
+      missingSkills: JSON.stringify(signal.missingSkills),
+      reasons: JSON.stringify(signal.reasons),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+  }
 
   return signal;
 }

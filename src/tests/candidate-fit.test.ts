@@ -216,4 +216,63 @@ describe('D1.7.4 Candidate Fit Intelligence', () => {
     expect(result!.score).toBeLessThanOrEqual(100);
     expect(result!.score).toBeGreaterThanOrEqual(0);
   });
+
+  describe('D1.7.4-H1 Idempotency & Persistence', () => {
+    it('1 & 2 & 3. Repeated execution reuses row idempotently', async () => {
+      await insertTestJob('job-idem-1');
+      const job = getBaseJob({ job: { title: 'Engineer', url: 'http://test.com', status: 'ACTIVE' }});
+      
+      // First run
+      await evaluateCandidateFit(runId, 'job-idem-1', job);
+      let results = await db.select().from(schema.candidateFitResults).where(eq(schema.candidateFitResults.runId, runId)).all();
+      expect(results.length).toBe(1);
+      const firstId = results[0].id;
+
+      // Second run (same runId, same jobId)
+      await evaluateCandidateFit(runId, 'job-idem-1', job);
+      results = await db.select().from(schema.candidateFitResults).where(eq(schema.candidateFitResults.runId, runId)).all();
+      expect(results.length).toBe(1); // STILL 1
+      expect(results[0].id).toBe(firstId); // REUSED ROW
+    });
+
+    it('4. Same job across different runs produces different rows', async () => {
+      await insertTestJob('job-idem-2');
+      const job = getBaseJob({ job: { title: 'Engineer', url: 'http://test.com', status: 'ACTIVE' }});
+      
+      const run2Id = crypto.randomUUID();
+      await db.insert(schema.runs).values({
+        id: run2Id,
+        configId: 'fit-config-1',
+        status: 'RUNNING',
+        currentStage: 'INGESTION',
+        profileSnapshot: { profileId: 'fit-prof-1', profileName: 'Test', snapshotAt: new Date().toISOString(), profile: {} },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+
+      await evaluateCandidateFit(runId, 'job-idem-2', job);
+      await evaluateCandidateFit(run2Id, 'job-idem-2', job);
+
+      const run1Results = await db.select().from(schema.candidateFitResults).where(eq(schema.candidateFitResults.runId, runId)).all();
+      const run2Results = await db.select().from(schema.candidateFitResults).where(eq(schema.candidateFitResults.runId, run2Id)).all();
+      
+      expect(run1Results.length).toBe(1);
+      expect(run2Results.length).toBe(1);
+
+      await db.delete(schema.candidateFitResults).where(eq(schema.candidateFitResults.runId, run2Id));
+      await db.delete(schema.runs).where(eq(schema.runs.id, run2Id));
+    });
+
+    it('5. Different jobs within same run produce different rows', async () => {
+      await insertTestJob('job-idem-3');
+      await insertTestJob('job-idem-4');
+      const job = getBaseJob({ job: { title: 'Engineer', url: 'http://test.com', status: 'ACTIVE' }});
+
+      await evaluateCandidateFit(runId, 'job-idem-3', job);
+      await evaluateCandidateFit(runId, 'job-idem-4', job);
+
+      const results = await db.select().from(schema.candidateFitResults).where(eq(schema.candidateFitResults.runId, runId)).all();
+      expect(results.length).toBe(2);
+    });
+  });
 });

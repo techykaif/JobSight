@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `fit_run_job_idx` ON `candidate_fit_results` (`run_id`,`job_id`);

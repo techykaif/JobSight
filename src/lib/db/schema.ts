@@ -603,6 +603,10 @@ export const candidateFitResults = sqliteTable('candidate_fit_results', {
   missingSkills: text('missing_skills', { mode: 'json' }),
   reasons: text('reasons', { mode: 'json' }),
   ...timestampFields
+}, (table) => {
+  return {
+    runJobIdx: uniqueIndex('fit_run_job_idx').on(table.runId, table.jobId)
+  }
 });
 
 export const applicationResults = sqliteTable('application_results', {
