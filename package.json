@@ -31,7 +31,9 @@
     "better-sqlite3": "^13.0.2",
     "drizzle-orm": "^0.45.2",
     "execa": "^10.0.1",
+    "mammoth": "^1.12.1",
     "next": "^16.3.0",
+    "pdf-parse": "^2.4.5",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "tsx": "^4.23.5",
@@ -42,6 +44,7 @@
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26.1.2",
+    "@types/pdf-parse": "^1.1.5",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "drizzle-kit": "^0.31.10",
