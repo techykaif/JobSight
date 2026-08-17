@@ -82,7 +82,15 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
       profile = profileRec[0];
       await db.update(schema.runs).set({ profileSnapshot: profile, startedAt: new Date().toISOString() }).where(eq(schema.runs.id, runId));
     } else {
-      profile = run.profileSnapshot;
+      const snapshot = run.profileSnapshot as Record<string, any>;
+      if (snapshot && typeof snapshot === 'object' && 'profileId' in snapshot && 'profile' in snapshot && typeof snapshot.profile === 'object') {
+        profile = {
+          name: snapshot.profileName,
+          ...snapshot.profile
+        };
+      } else {
+        profile = snapshot;
+      }
     }
     
     let validProfile: CandidateProfile;
@@ -166,7 +174,27 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
 
         await checkPauseOrCancel();
         try {
-          const qResult = await qualifyJob(job, config, validProfile, abortSignal);
+          const artifactRes = await db.select().from(schema.researchArtifacts).where(eq(schema.researchArtifacts.entityId, job.id)).limit(1);
+          const sourceRes = await db.select().from(schema.jobSources).where(eq(schema.jobSources.jobId, job.id)).limit(1);
+          const artifact = artifactRes[0];
+          const source = sourceRes[0];
+
+          const hasArtifact = !!artifact && !!artifact.rawContent && artifact.rawContent.trim().length > 0;
+          const hasSuccessfulFetch = source && source.httpStatus !== null && source.httpStatus >= 200 && source.httpStatus < 300;
+          const hasEvidence = hasArtifact || hasSuccessfulFetch;
+
+          let qResult;
+          if (!hasEvidence) {
+            qResult = {
+              decision: 'SKIP' as const,
+              reasons: ['Insufficient verified source evidence.'],
+              unknowns: ['rawContent', 'httpStatus'],
+              scores: { resumeMatch: 0, requirementMatch: 0, opportunity: 0, confidence: 0 },
+              analysis: null
+            };
+          } else {
+            qResult = await qualifyJob(job, config, validProfile, abortSignal);
+          }
           
           await db.insert(schema.decisions).values({
             id: crypto.randomUUID(),

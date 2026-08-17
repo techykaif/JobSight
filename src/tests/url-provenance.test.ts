@@ -163,5 +163,9 @@ describe('D1.7.1-H1 URL Provenance & Integrity', () => {
       expect(jobs.length).toBe(1);
       expect(jobs[0]?.canonicalTitle).toBe('Engineer 2'); // Updated
     });
+    it('26. vertex grounding redirect cannot become the final actionable URL', () => {
+      const vertexUrl = 'https://vertexaisearch.cloud.google.com/grounding-api-redirect/some_token_123';
+      expect(() => validateOriginalJobUrl(vertexUrl)).toThrowError(UrlValidationError);
+    });
   });
 });

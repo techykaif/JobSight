@@ -125,6 +125,15 @@ describe('M9 Bugfixes: Orchestrator & Qualification', () => {
         runId,
         observedAt: new Date().toISOString()
       });
+      await db.insert(schema.researchArtifacts).values({
+        id: crypto.randomUUID(),
+        runId,
+        entityType: 'JOB',
+        entityId: jobId,
+        workerType: 'TEST',
+        rawContent: 'Verified source content for test.',
+        createdAt: new Date().toISOString()
+      });
     }
 
     return runId;
@@ -187,7 +196,17 @@ describe('M9 Bugfixes: Orchestrator & Qualification', () => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }).returning({ id: schema.jobs.id }).then(async (res) => {
-      await db.insert(schema.jobObservations).values({ id: crypto.randomUUID(), jobId: res[0]!.id, runId, observedAt: new Date().toISOString() });
+      const jobId = res[0]!.id;
+      await db.insert(schema.jobObservations).values({ id: crypto.randomUUID(), jobId, runId, observedAt: new Date().toISOString() });
+      await db.insert(schema.researchArtifacts).values({
+        id: crypto.randomUUID(),
+        runId,
+        entityType: 'JOB',
+        entityId: jobId,
+        workerType: 'TEST',
+        rawContent: 'Verified source content for test.',
+        createdAt: new Date().toISOString()
+      });
     });
 
     await runMission(runId, new AbortController().signal, () => false);

@@ -17,7 +17,8 @@ const DENYLIST_DOMAINS = [
   'baidu.com',
   'www.baidu.com',
   'yandex.com',
-  'www.yandex.com'
+  'www.yandex.com',
+  'vertexaisearch.cloud.google.com'
 ];
 
 const GENERIC_PATHS = [

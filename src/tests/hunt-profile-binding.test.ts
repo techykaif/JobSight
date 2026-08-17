@@ -13,6 +13,7 @@ import { getCurrentUserId } from '../lib/auth';
 describe('D1.7.3 Hunt Profile Binding & Snapshot Immutability', () => {
   beforeEach(async () => {
     migrate(db, { migrationsFolder: './src/lib/db/migrations' });
+    await db.delete(schema.pipelineEvents);
     await db.delete(schema.runs);
     await db.delete(schema.huntConfigs);
     await db.delete(schema.profiles);
@@ -38,7 +39,7 @@ describe('D1.7.3 Hunt Profile Binding & Snapshot Immutability', () => {
     const runs = await db.select().from(schema.runs);
     expect(runs.length).toBe(1);
     expect(runs[0]!.profileSnapshot).toBeNull();
-    
+
     const configs = await db.select().from(schema.huntConfigs);
     expect(configs[0]!.profileId).toBeNull();
   });
@@ -63,14 +64,14 @@ describe('D1.7.3 Hunt Profile Binding & Snapshot Immutability', () => {
 
     const runs = await db.select().from(schema.runs);
     expect(runs.length).toBe(1);
-    
+
     const snapshot: any = runs[0]!.profileSnapshot;
     expect(snapshot).not.toBeNull();
     expect(snapshot.profileId).toBe('prof-1');
     expect(snapshot.profileName).toBe('Test Profile');
     expect(snapshot.profile.yearsOfProfessionalExperience).toBe(5);
     expect(snapshot.profile.skills).toEqual(['TypeScript']);
-    
+
     // 13. Does not contain raw resume data (only structured fields)
     expect(snapshot.rawDocument).toBeUndefined();
   });
@@ -124,10 +125,10 @@ describe('D1.7.3 Hunt Profile Binding & Snapshot Immutability', () => {
 
     runs = await db.select().from(schema.runs);
     expect(runs.length).toBe(2);
-    
+
     snap1 = runs[0]!.profileSnapshot;
     const snap2: any = runs[1]!.profileSnapshot;
-    
+
     // Original run snapshot is immutable
     expect(snap1.profile.yearsOfProfessionalExperience).toBe(1);
     // New run gets updated state
@@ -189,5 +190,103 @@ describe('D1.7.3 Hunt Profile Binding & Snapshot Immutability', () => {
 
     const runs = await db.select().from(schema.runs).where(eq(schema.runs.id, 'legacy-run'));
     expect(runs[0]!.profileSnapshot).toBeNull();
+  });
+
+  it('14. orchestrator successfully unwraps the immutable envelope snapshot', async () => {
+    const { runMission } = await import('../lib/pipeline/orchestrator');
+    const runId = crypto.randomUUID();
+    const configId = crypto.randomUUID();
+
+    await db.insert(schema.huntConfigs).values({
+      id: configId,
+      targetRoles: ['Test'],
+      alternativeRoles: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    } as any);
+
+    await db.insert(schema.runs).values({
+      id: runId,
+      configId,
+      status: 'CREATED',
+      lastCheckpoint: 'APPLICATION_INTELLIGENCE_COMPLETED', // skip all execution to isolate validation
+      profileSnapshot: {
+        profileId: 'prof-xyz',
+        profileName: 'Kaif_New_profile',
+        snapshotAt: new Date().toISOString(),
+        profile: {
+          yearsOfProfessionalExperience: 2,
+          education: 'Degree',
+          targetRoles: ['Engineer'],
+          skills: ['JS'],
+          projectExperience: [],
+          preferredRoles: [],
+          salaryExpectations: { minimum: 10, preferred: 20, currency: 'USD' },
+          remotePreference: 'REMOTE_ONLY',
+          allowedRegions: [],
+          employmentPreferences: []
+        }
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+
+    const abortController = new AbortController();
+    await runMission(runId, abortController.signal, () => false);
+
+    // If validation failed, errorSummary will contain "Profile validation failed"
+    const runRes = await db.select().from(schema.runs).where(eq(schema.runs.id, runId));
+    expect(runRes[0]?.errorSummary).toBeNull();
+  });
+
+  it('15. orchestrator successfully supports legacy flat profile snapshots', async () => {
+    const { runMission } = await import('../lib/pipeline/orchestrator');
+    const runId = crypto.randomUUID();
+    const configId = crypto.randomUUID();
+
+    console.log('Inserting config');
+    await db.insert(schema.huntConfigs).values({
+      id: configId,
+      targetRoles: ['Test'],
+      alternativeRoles: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    } as any);
+
+    console.log('Inserting run');
+    await db.insert(schema.runs).values({
+      id: runId,
+      configId,
+      status: 'CREATED',
+      lastCheckpoint: 'APPLICATION_INTELLIGENCE_COMPLETED', // skip all execution to isolate validation
+      profileSnapshot: {
+        id: 'legacy-id',
+        name: 'Legacy Profile',
+        yearsOfProfessionalExperience: 3,
+        education: 'BSc',
+        targetRoles: ['Dev'],
+        skills: ['Python'],
+        projectExperience: [],
+        preferredRoles: [],
+        salaryExpectations: null,
+        remotePreference: null,
+        allowedRegions: [],
+        employmentPreferences: []
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+
+    const abortController = new AbortController();
+    console.log('Running mission');
+    try {
+      await runMission(runId, abortController.signal, () => false);
+    } catch (e: any) {
+      console.log('runMission threw:', e.message);
+    }
+    console.log('Finished mission');
+
+    const runRes = await db.select().from(schema.runs).where(eq(schema.runs.id, runId));
+    expect(runRes[0]?.errorSummary).toBeNull();
   });
 });

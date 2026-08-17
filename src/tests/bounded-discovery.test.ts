@@ -127,6 +127,15 @@ describe('Bounded Over-Discovery', () => {
         runId,
         observedAt: new Date().toISOString()
       });
+      await db.insert(schema.researchArtifacts).values({
+        id: crypto.randomUUID(),
+        runId,
+        entityType: 'JOB',
+        entityId: jobId,
+        workerType: 'TEST',
+        rawContent: 'Verified source content for test.',
+        createdAt: new Date().toISOString()
+      });
     }
 
     await runMission(runId, new AbortController().signal, () => false);
@@ -189,6 +198,15 @@ describe('Bounded Over-Discovery', () => {
         jobId,
         runId,
         observedAt: new Date().toISOString()
+      });
+      await db.insert(schema.researchArtifacts).values({
+        id: crypto.randomUUID(),
+        runId,
+        entityType: 'JOB',
+        entityId: jobId,
+        workerType: 'TEST',
+        rawContent: 'Verified source content for test.',
+        createdAt: new Date().toISOString()
       });
     }
 
@@ -256,6 +274,15 @@ describe('Bounded Over-Discovery', () => {
         jobId,
         runId,
         observedAt: new Date().toISOString()
+      });
+      await db.insert(schema.researchArtifacts).values({
+        id: crypto.randomUUID(),
+        runId,
+        entityType: 'JOB',
+        entityId: jobId,
+        workerType: 'TEST',
+        rawContent: 'Verified source content for test.',
+        createdAt: new Date().toISOString()
       });
     }
 
