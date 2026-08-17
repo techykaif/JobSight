@@ -596,6 +596,81 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
 
     await checkPauseOrCancel();
 
+    // MARKET INTELLIGENCE
+    const skipMarketIntelligence = false;
+    if (!skipMarketIntelligence) {
+      await updateState('RUNNING', 'MARKET_INTELLIGENCE');
+      await emitEvent({ runId, type: 'MARKET_INTELLIGENCE_STARTED', stage: 'MARKET_INTELLIGENCE' });
+
+      const runJobs = await db.select({
+        job: schema.jobs,
+        source: schema.jobSources,
+        artifact: schema.researchArtifacts
+      }).from(schema.jobObservations)
+        .innerJoin(schema.jobs, eq(schema.jobObservations.jobId, schema.jobs.id))
+        .leftJoin(schema.jobSources, eq(schema.jobs.id, schema.jobSources.jobId))
+        .leftJoin(schema.researchArtifacts, eq(schema.jobs.id, schema.researchArtifacts.entityId))
+        .where(eq(schema.jobObservations.runId, runId));
+
+      const similarJobsInRun = runJobs.map(r => r.job);
+
+      // We only want one artifact per job (e.g. the first one)
+      const artifactMap = new Map<string, string>();
+      for (const row of runJobs) {
+        if (row.artifact && !artifactMap.has(row.job.id)) {
+          artifactMap.set(row.job.id, row.artifact.rawContent);
+        }
+      }
+
+      // We only process each job once
+      const processedJobIds = new Set<string>();
+
+      const { runMarketIntelligence } = await import('../intelligence/market/engine.js');
+      const { saveMarketIntelligence } = await import('./../db/repositories/marketIntelligence.js');
+
+      for (const row of runJobs) {
+        if (processedJobIds.has(row.job.id)) continue;
+        processedJobIds.add(row.job.id);
+
+        await checkPauseOrCancel();
+
+        try {
+          const context: any = {
+            job: row.job as any,
+            runId,
+            similarJobsInRun: similarJobsInRun as any
+          };
+          if (row.source?.sourceUrl) context.sourceUrl = row.source.sourceUrl;
+          if (row.source?.sourceType) context.sourceProviderType = row.source.sourceType;
+          if (artifactMap.get(row.job.id)) context.rawContent = artifactMap.get(row.job.id);
+
+          const result = runMarketIntelligence(context);
+          await saveMarketIntelligence(runId, row.job.id, result);
+
+          await emitEvent({
+            runId,
+            type: 'MARKET_INTELLIGENCE_COMPLETED',
+            stage: 'MARKET_INTELLIGENCE',
+            entityType: 'JOB',
+            entityId: row.job.id,
+            message: `Market intelligence evaluated: ${result.opportunityIntelligence}`
+          });
+        } catch (err: any) {
+          if (err.message === 'Mission Cancelled' || err.name === 'AbortError') throw err;
+          await emitEvent({
+            runId,
+            type: 'MARKET_INTELLIGENCE_FAILED',
+            stage: 'MARKET_INTELLIGENCE',
+            entityType: 'JOB',
+            entityId: row.job.id,
+            message: `Market intelligence failed: ${err.message}`
+          });
+        }
+      }
+    }
+
+    await checkPauseOrCancel();
+
     // DISCOVERY INTELLIGENCE
     if (!skipDiscoveryIntelligence) {
       await updateState('RUNNING', 'DISCOVERY_INTELLIGENCE');

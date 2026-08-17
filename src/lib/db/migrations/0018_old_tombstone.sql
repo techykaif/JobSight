@@ -1,0 +1,22 @@
+CREATE TABLE `market_intelligence` (
+	`id` text PRIMARY KEY NOT NULL,
+	`run_id` text NOT NULL,
+	`job_id` text NOT NULL,
+	`visibility_level` text NOT NULL,
+	`visibility_evidence` text NOT NULL,
+	`visibility_confidence` text NOT NULL,
+	`competition_level` text NOT NULL,
+	`competition_evidence` text NOT NULL,
+	`competition_confidence` text NOT NULL,
+	`friction_level` text NOT NULL,
+	`friction_evidence` text NOT NULL,
+	`friction_confidence` text NOT NULL,
+	`applicant_volume` integer,
+	`applicant_volume_is_lower_bound` integer,
+	`applicant_volume_observed_at` text,
+	`opportunity_intelligence_level` text NOT NULL,
+	`created_at` text NOT NULL,
+	`updated_at` text NOT NULL,
+	FOREIGN KEY (`run_id`) REFERENCES `runs`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`job_id`) REFERENCES `jobs`(`id`) ON UPDATE no action ON DELETE no action
+);

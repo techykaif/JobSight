@@ -349,6 +349,32 @@ export const opportunityIntelligence = sqliteTable('opportunity_intelligence', {
   ...timestampFields
 });
 
+export const marketIntelligence = sqliteTable('market_intelligence', {
+  id: text('id').primaryKey(),
+  runId: text('run_id').notNull().references(() => runs.id),
+  jobId: text('job_id').notNull().references(() => jobs.id),
+
+  visibilityLevel: text('visibility_level').notNull(),
+  visibilityEvidence: text('visibility_evidence', { mode: 'json' }).notNull(),
+  visibilityConfidence: text('visibility_confidence').notNull(),
+
+  competitionLevel: text('competition_level').notNull(),
+  competitionEvidence: text('competition_evidence', { mode: 'json' }).notNull(),
+  competitionConfidence: text('competition_confidence').notNull(),
+
+  frictionLevel: text('friction_level').notNull(),
+  frictionEvidence: text('friction_evidence', { mode: 'json' }).notNull(),
+  frictionConfidence: text('friction_confidence').notNull(),
+
+  applicantVolume: integer('applicant_volume'),
+  applicantVolumeIsLowerBound: integer('applicant_volume_is_lower_bound', { mode: 'boolean' }),
+  applicantVolumeObservedAt: text('applicant_volume_observed_at'),
+
+  opportunityIntelligence: text('opportunity_intelligence_level').notNull(),
+
+  ...timestampFields
+});
+
 export const decisionResults = sqliteTable('decision_results', {
   id: text('id').primaryKey(),
   jobId: text('job_id').notNull().references(() => jobs.id),
