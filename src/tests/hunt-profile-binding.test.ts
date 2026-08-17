@@ -87,7 +87,8 @@ describe('D1.7.3 Hunt Profile Binding & Snapshot Immutability', () => {
       updatedAt: new Date().toISOString()
     });
 
-    await expect(saveHuntConfig(getFormData({ profileId: 'prof-2' }))).rejects.toThrow('Unauthorized or missing profile');
+    const res = await saveHuntConfig(getFormData({ profileId: 'prof-2' }));
+    expect(res?.error).toMatch(/profile not found/i);
   });
 
   it('8. & 10. editing live profile after Run creation does NOT change snapshot, future Run gets new state', async () => {
@@ -162,7 +163,8 @@ describe('D1.7.3 Hunt Profile Binding & Snapshot Immutability', () => {
     expect(snapshot.profileName).toBe('Delete Me');
 
     // Creating new run with missing profile throws
-    await expect(saveHuntConfig(getFormData({ profileId: 'prof-4' }))).rejects.toThrow('Unauthorized or missing profile');
+    const res = await saveHuntConfig(getFormData({ profileId: 'prof-4' }));
+    expect(res?.error).toMatch(/profile not found/i);
   });
 
   it('12. existing no-profile Hunts continue functioning', async () => {

@@ -65,9 +65,52 @@ class MissionManager {
 
     this.startHeartbeat(runId);
 
+    // --- maximumRuntime enforcement ---
+    // Load the hunt config to read the configured runtime limit.
+    const configRows = await db.select({ maximumRuntime: schema.huntConfigs.maximumRuntime })
+      .from(schema.huntConfigs)
+      .where(eq(schema.huntConfigs.id, run.configId))
+      .limit(1);
+    const maximumRuntime = configRows[0]?.maximumRuntime ?? null;
+
+    let runtimeTimeoutId: NodeJS.Timeout | null = null;
+
+    if (maximumRuntime !== null && maximumRuntime > 0) {
+      const capturedAbortController = this.abortController;
+      runtimeTimeoutId = setTimeout(async () => {
+        // Only act if this run is still the active one
+        if (this.activeRunId !== runId) return;
+        console.log(`[MISSION] Runtime limit of ${maximumRuntime}ms exceeded for run ${runId}. Aborting.`);
+        capturedAbortController.abort();
+        // Explicitly update run status so it is terminal even if the
+        // orchestrator's catch block hasn't reached a checkpoint yet.
+        try {
+          await db.update(schema.runs).set({
+            status: 'FAILED',
+            errorSummary: `Runtime limit exceeded (configured: ${maximumRuntime}ms)`,
+            updatedAt: new Date().toISOString()
+          }).where(eq(schema.runs.id, runId));
+          await emitEvent({
+            runId,
+            type: 'RUN_FAILED',
+            stage: 'TIMEOUT',
+            message: `Runtime limit of ${maximumRuntime}ms exceeded. Mission aborted.`
+          });
+        } catch (e) {
+          console.error('[MISSION] Failed to persist timeout status for run', runId, e);
+        }
+      }, maximumRuntime);
+    }
+
     // Start asynchronously
     runMission(runId, this.abortController.signal, () => this.isPauseRequested())
       .finally(async () => {
+        // Clear the runtime timeout — if the run finished before the limit,
+        // we must not fire the abort after the fact.
+        if (runtimeTimeoutId !== null) {
+          clearTimeout(runtimeTimeoutId);
+          runtimeTimeoutId = null;
+        }
         if (this.activeRunId === runId) {
           this.activeRunId = null;
           this.abortController = null;

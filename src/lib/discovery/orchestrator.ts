@@ -64,6 +64,20 @@ export async function runDiscovery(runId: string, config: any, abortSignal?: Abo
   // 3. Prioritize Sources via Strategy
   const prioritizedSources = strategy.prioritizeSources(baseSources);
 
+  // Enforce maximumProviders: cap the source list BEFORE execution so the
+  // configured limit is respected deterministically. Priority ordering is
+  // preserved — we just take the top N entries.
+  const maxProviders = typeof config.maximumProviders === 'number' && config.maximumProviders > 0
+    ? config.maximumProviders
+    : null;
+  const sourcesToExecute = maxProviders !== null
+    ? prioritizedSources.slice(0, maxProviders)
+    : prioritizedSources;
+
+  if (maxProviders !== null && prioritizedSources.length > maxProviders) {
+    console.log(`[Discovery] maximumProviders=${maxProviders}: using ${maxProviders} of ${prioritizedSources.length} resolved sources.`);
+  }
+
   // Resolve which registered provider (if any) will actually handle each
   // source, so telemetry shows resolution results even for sources that
   // never get attempted due to early termination.
@@ -114,7 +128,7 @@ export async function runDiscovery(runId: string, config: any, abortSignal?: Abo
   let totalLatencyMs = 0;
 
   // 4. Execute Discovery Loop
-  for (const source of prioritizedSources) {
+  for (const source of sourcesToExecute) {
     if (abortSignal?.aborted) {
       earlyTerminated = true;
       terminationReason = 'Abort signal received';

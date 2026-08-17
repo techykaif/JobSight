@@ -2,8 +2,16 @@ import crypto from 'crypto';
 import * as repos from '../db/repositories/index.js';
 import { providerRegistry } from './registry.js';
 import type { DiscoverySourceTarget } from './strategy/interfaces.js';
+import { checkDiscoveryUrlSafety } from './url-safety.js';
 
 export async function identifyAndPersistUserSource(url: string, groupId?: string): Promise<DiscoverySourceTarget | null> {
+  // Reject unsafe URLs before any provider lookup or DB write
+  const safetyCheck = checkDiscoveryUrlSafety(url);
+  if (!safetyCheck.safe) {
+    console.warn(`[SourceManager] User URL rejected by safety check: ${url} — ${safetyCheck.reason}`);
+    return null;
+  }
+
   const provider = safeFindProviderForUrl(url);
   if (!provider) {
     console.warn(`[SourceManager] Unrecognized provider for URL: ${url}`);
@@ -67,6 +75,15 @@ export async function resolveDiscoverySources(config: any): Promise<DiscoverySou
   const seenUrls = new Set<string>();
 
   const addSource = (url: string, type: string) => {
+    if (url !== 'SEARCH_ENGINE') {
+      // Use centralized URL safety validator — single source of truth for SSRF prevention
+      const safetyCheck = checkDiscoveryUrlSafety(url);
+      if (!safetyCheck.safe) {
+        console.warn(`[SourceManager] Source rejected by safety check: ${url} — ${safetyCheck.reason}`);
+        return;
+      }
+    }
+
     if (!seenUrls.has(url)) {
       seenUrls.add(url);
       resolved.push({ url, type });

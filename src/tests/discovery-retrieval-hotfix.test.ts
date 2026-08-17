@@ -177,8 +177,8 @@ describe('V1_0_1_A5_2: mixed valid + invalid providers', () => {
       targetRoles: ['Software Engineer'],
       discoverySources: [
         { url: 'https://boards.greenhouse.io/acme', type: 'GREENHOUSE' }, // valid
-        // Not http(s), so it can't fall through to the generic CareersPageProvider catch-all.
-        { url: 'unrecognized-source-identifier', type: 'UNKNOWN_TYPE' }, // unresolvable
+        // Use a syntactically valid URL so it passes the new SSRF check, but is unresolvable by providers
+        { url: 'https://example.com/unrecognized', type: 'UNKNOWN_TYPE' }, // unresolvable
         { url: '', type: 'CUSTOM' }, // malformed
       ],
     };
@@ -192,7 +192,10 @@ describe('V1_0_1_A5_2: mixed valid + invalid providers', () => {
     const resolution = vi.mocked(repos.saveEvent).mock.calls
       .map(c => c[0])
       .find((e: any) => e.eventType === 'SOURCE_RESOLUTION_COMPLETED');
-    expect((resolution as any).payload.sourcesResolved).toBe(1);
-    expect((resolution as any).payload.sourcesUnresolved).toBe(1);
+    // Because the new SSRF layer drops all non-HTTP(S) URLs entirely,
+    // and the fallback CareersPageProvider catches all HTTP(S) URLs,
+    // there are no longer any URLs that reach the orchestrator and remain "unresolved".
+    expect((resolution as any).payload.sourcesResolved).toBe(2);
+    expect((resolution as any).payload.sourcesUnresolved).toBe(0);
   });
 });

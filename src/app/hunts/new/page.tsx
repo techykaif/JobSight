@@ -1,10 +1,11 @@
 'use client';
 
-import { saveHuntConfig } from './actions';
-import { useState, useRef, useEffect } from 'react';
+import { saveHuntConfig, type HuntFormState } from './actions';
+import { useState, useEffect, useActionState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { getProfiles } from '@/app/profile/actions';
 import { ProfileModal } from '@/components/profile/ProfileModal';
+
 
 const COMMON_PROVIDERS = [
   { id: 'provider_greenhouse', name: 'Greenhouse', icon: '🌱' },
@@ -28,6 +29,15 @@ const FAVOURITE_COMPANIES = [
 ];
 
 export default function NewHuntPage() {
+  // useActionState wires the server action to React's form state.
+  // - formAction: replaces `saveHuntConfig` as the form's action prop
+  // - pending: true while the action is executing (prevents double-submit)
+  // - state: the returned HuntFormState from the server action (null or { error })
+  const [state, formAction, pending] = useActionState<HuntFormState, FormData>(
+    saveHuntConfig,
+    null
+  );
+
   const [urls, setUrls] = useState<string[]>([]);
   const [urlInput, setUrlInput] = useState('');
   const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set(['group_yc']));
@@ -43,6 +53,7 @@ export default function NewHuntPage() {
   useEffect(() => {
     fetchProfiles();
   }, []);
+
 
   const handleUrlKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -96,7 +107,7 @@ export default function NewHuntPage() {
         </div>
       </div>
 
-      <form action={saveHuntConfig} className="hunt-form">
+      <form action={formAction} className="hunt-form">
         <div className="form-grid">
           {/* Left Column - Core Settings */}
           <div className="form-column">
@@ -310,9 +321,27 @@ export default function NewHuntPage() {
         </div>
 
         <div className="form-actions">
-          <button type="submit" className="btn btn-primary submit-btn">
-            <span className="submit-icon">✨</span>
-            Launch Intelligence Hunt
+          {state?.error && (
+            <div role="alert" style={{
+              color: 'var(--danger-text)',
+              background: 'rgba(239,68,68,0.08)',
+              border: '1px solid rgba(239,68,68,0.3)',
+              borderRadius: '8px',
+              padding: '0.75rem 1rem',
+              fontSize: '0.875rem',
+              marginBottom: '0.75rem',
+            }}>
+              {state.error}
+            </div>
+          )}
+          <button
+            type="submit"
+            className="btn btn-primary submit-btn"
+            disabled={pending}
+            aria-busy={pending}
+          >
+            <span className="submit-icon">{pending ? '⏳' : '✨'}</span>
+            {pending ? 'Launching…' : 'Launch Intelligence Hunt'}
           </button>
         </div>
       </form>

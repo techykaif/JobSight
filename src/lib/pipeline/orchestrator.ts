@@ -947,6 +947,21 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
   } catch (error: any) {
     if (error.message === 'Mission Cancelled' || error.name === 'AbortError') {
       console.log(`[ORCHESTRATOR] Mission ${runId} cancelled cleanly.`);
+      // If the abort fired inside a deep await (bypassing checkPauseOrCancel),
+      // the run status may still be RUNNING. Ensure it has a terminal state.
+      // If the missionManager timeout handler already set FAILED, respect that.
+      const terminalStatuses = ['COMPLETED', 'COMPLETED_WITH_FAILURES', 'FAILED', 'CANCELLED'];
+      try {
+        const currentState = await db.select({ status: schema.runs.status })
+          .from(schema.runs)
+          .where(eq(schema.runs.id, runId))
+          .limit(1);
+        if (currentState[0] && !terminalStatuses.includes(currentState[0].status)) {
+          await updateState('CANCELLED', 'ABORTED');
+        }
+      } catch (stateErr) {
+        console.error(`[ORCHESTRATOR] Failed to verify terminal state for run ${runId}`, stateErr);
+      }
     } else {
       console.error(`[ORCHESTRATOR] Fatal Error in run ${runId}`, error);
       await updateState('FAILED', 'FAILED');

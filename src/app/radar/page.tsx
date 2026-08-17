@@ -118,6 +118,9 @@ export default async function DiscoveryRadarPage() {
     .limit(6);
 
   // 6. AI Companies
+  // Use word-boundary patterns for "AI" to prevent false positives on
+  // 'Container', 'Retail', 'Chair', 'Email', 'Maintenance', etc.
+  // SQLite LIKE is case-insensitive for ASCII, so 'AI %' also matches 'ai '.
   const aiJobs = await db
     .select({
       id: schema.jobs.id,
@@ -133,7 +136,33 @@ export default async function DiscoveryRadarPage() {
     })
     .from(schema.jobs)
     .leftJoin(schema.companies, eq(schema.jobs.companyId, schema.companies.id))
-    .where(or(like(schema.jobs.description, '%AI%'), like(schema.jobs.description, '%Machine Learning%'), like(schema.jobs.canonicalTitle, '%AI%')))
+    .where(or(
+      // Title: word-boundary patterns for standalone "AI"
+      like(schema.jobs.canonicalTitle, 'AI %'),          // "AI Engineer", "AI Lead"
+      like(schema.jobs.canonicalTitle, '% AI %'),         // "Senior AI Engineer"
+      like(schema.jobs.canonicalTitle, '% AI'),           // "Head of AI"
+      sql`lower(${schema.jobs.canonicalTitle}) = 'ai'`,  // Exactly "AI"
+      // Title: word-boundary patterns for standalone "ML"
+      like(schema.jobs.canonicalTitle, 'ML %'),
+      like(schema.jobs.canonicalTitle, '% ML %'),
+      like(schema.jobs.canonicalTitle, '% ML'),
+      sql`lower(${schema.jobs.canonicalTitle}) = 'ml'`,
+      // Title: explicit multi-word patterns safe from false positives
+      like(schema.jobs.canonicalTitle, '%Machine Learning%'),
+      like(schema.jobs.canonicalTitle, '%Artificial Intelligence%'),
+      like(schema.jobs.canonicalTitle, '%Deep Learning%'),
+      like(schema.jobs.canonicalTitle, '%Neural%'),
+      like(schema.jobs.canonicalTitle, '%LLM%'),
+      like(schema.jobs.canonicalTitle, '%NLP%'),
+      like(schema.jobs.canonicalTitle, '%GenAI%'),
+      like(schema.jobs.canonicalTitle, '%Gen AI%'),
+      like(schema.jobs.canonicalTitle, '%MLOps%'),
+      like(schema.jobs.canonicalTitle, '%Computer Vision%'),
+      // Description: explicit phrases — avoids matching 'paid', 'trail', 'email', etc.
+      like(schema.jobs.description, '%artificial intelligence%'),
+      like(schema.jobs.description, '%machine learning%'),
+      like(schema.jobs.description, '%deep learning%'),
+    ))
     .limit(6);
 
   // 7. Fast Hiring
