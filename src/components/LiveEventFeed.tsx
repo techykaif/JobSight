@@ -66,18 +66,53 @@ function getEventColor(eventType: string) {
   return 'var(--border-color)';
 }
 
-export default function LiveEventFeed({ runId }: { runId: string }) {
+export function humanizeEventName(eventType: string): string {
+  const map: Record<string, string> = {
+    'RUN_STARTED': 'Run Started',
+    'PREFLIGHT_STARTED': 'Preflight',
+    'DISCOVERY_STARTED': 'Discovery',
+    'STRATEGY_STARTED': 'Discovery Strategy',
+    'SOURCE_RESOLUTION_COMPLETED': 'Sources Resolved',
+    'PROVIDER_STARTED': 'Provider Started',
+    'HEARTBEAT': 'Waiting for Provider',
+    'PROVIDER_COMPLETED': 'Provider Completed',
+    'STRATEGY_COMPLETED': 'Discovery Complete',
+    'STAGE_B_TELEMETRY': 'Structuring',
+    'DISCOVERY_BATCH_COMPLETED': 'Discovery Complete',
+    'QUALIFICATION_STARTED': 'Qualification',
+    'COMPANY_RESEARCH_SKIPPED': 'Company Research Skipped',
+    'FOUNDATION_STARTED': 'Foundation',
+    'COMPETITION_STARTED': 'Competition',
+    'COMPANY_OPPORTUNITY_STARTED': 'Opportunity',
+    'DISCOVERY_INTELLIGENCE_STARTED': 'Discovery Intelligence',
+    'APPLICATION_INTELLIGENCE_STARTED': 'Application Intelligence',
+    'RUN_COMPLETED': 'Run Completed'
+  };
+  if (map[eventType]) return map[eventType];
+  return eventType.split('_').map(w => w.charAt(0) + w.slice(1).toLowerCase()).join(' ');
+}
+
+export default function LiveEventFeed({ 
+  runId,
+  initialStatus,
+  initialElapsed
+}: { 
+  runId: string,
+  initialStatus?: string,
+  initialElapsed?: number
+}) {
   const [events, setEvents] = useState<any[]>([]);
   const [connected, setConnected] = useState(false);
   const [metrics, setMetrics] = useState<any>(null);
-  const [statusInfo, setStatusInfo] = useState<any>(null);
-  const [elapsed, setElapsed] = useState<number>(0);
+  const [statusInfo, setStatusInfo] = useState<any>(initialStatus ? { status: initialStatus, stage: '' } : null);
+  const [elapsed, setElapsed] = useState<number>(initialElapsed || 0);
   
   const eventsEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    if (connected && statusInfo?.status === 'RUNNING') {
+    const isTerminal = statusInfo?.status === 'COMPLETED' || statusInfo?.status === 'FAILED' || statusInfo?.status === 'CANCELLED';
+    if (connected && !isTerminal) {
       timer = setInterval(() => setElapsed(prev => prev + 1), 1000);
     }
     return () => clearInterval(timer);
@@ -97,7 +132,7 @@ export default function LiveEventFeed({ runId }: { runId: string }) {
       }
       if (data.type === 'METRICS') {
         setMetrics(data.metrics);
-        if (data.metrics.elapsedTime) {
+        if (data.metrics.elapsedTime && statusInfo?.status !== 'COMPLETED' && statusInfo?.status !== 'FAILED' && statusInfo?.status !== 'CANCELLED') {
           setElapsed(Math.floor(data.metrics.elapsedTime / 1000));
         }
         return;
@@ -118,7 +153,7 @@ export default function LiveEventFeed({ runId }: { runId: string }) {
     };
 
     return () => es.close();
-  }, [runId]);
+  }, [runId, statusInfo?.status]);
 
   useEffect(() => {
     eventsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -154,55 +189,55 @@ export default function LiveEventFeed({ runId }: { runId: string }) {
         }
         .progress-bar-fill {
           height: 100%;
-          background: linear-gradient(90deg, var(--accent-color), #8a2be2);
+          background: linear-gradient(90deg, var(--accent), #8a2be2);
           transition: width 0.3s ease;
         }
         .event-card {
           display: flex;
-          align-items: flex-start;
-          gap: 1rem;
-          padding: 1rem;
-          background: rgba(22, 27, 34, 0.4);
-          border: 1px solid var(--border-color);
-          border-radius: 8px;
-          margin-bottom: 0.75rem;
-          transition: transform 0.2s;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 0.75rem 1rem;
+          border-bottom: 1px solid var(--border-subtle);
+          transition: background 0.2s;
+        }
+        .event-card:last-child {
+          border-bottom: none;
         }
         .event-card:hover {
-          transform: translateX(4px);
-          border-color: var(--border-focus);
+          background: var(--bg-subtle);
         }
         .event-icon {
-          padding: 8px;
-          border-radius: 8px;
+          padding: 6px;
+          border-radius: 6px;
           display: flex;
           align-items: center;
           justify-content: center;
+          flex-shrink: 0;
         }
       `}} />
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', fontSize: '1.25rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-5)' }}>
+        <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', fontSize: '1.125rem', fontWeight: 600 }}>
           Live Pipeline {connected && statusInfo?.status === 'RUNNING' && <span className="live-pulse"></span>}
         </h3>
         {elapsed > 0 && (
-          <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+          <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
             Elapsed: {Math.floor(elapsed / 60)}m {elapsed % 60}s
           </div>
         )}
       </div>
 
       {statusInfo && (
-        <div style={{ marginBottom: '2rem', padding: '1.5rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '1rem' }}>
+        <div style={{ marginBottom: 'var(--space-6)', padding: 'var(--space-5)', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-subtle)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 'var(--space-4)' }}>
             <div>
-              <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Current Stage</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 600 }}>{statusInfo.stage || 'INITIALIZING'}</div>
+              <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.05em', marginBottom: '4px' }}>Current Stage</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-primary)' }}>{statusInfo.stage || 'INITIALIZING'}</div>
             </div>
             {currentProvider && (
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Active Provider</div>
-                <div style={{ fontSize: '1rem', color: 'var(--accent-color)' }}>{currentProvider}</div>
+                <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.05em', marginBottom: '4px' }}>Active Provider</div>
+                <div style={{ fontSize: '1rem', color: 'var(--accent)', fontWeight: 500 }}>{currentProvider}</div>
               </div>
             )}
           </div>
@@ -214,36 +249,36 @@ export default function LiveEventFeed({ runId }: { runId: string }) {
       )}
 
       {metrics && (
-        <div className="dashboard-grid" style={{ marginBottom: '2rem' }}>
-          <div className="stat-card">
-            <div className="stat-card-title">Providers</div>
-            <div className="stat-card-value">{metrics.providersUsed || 0}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
+          <div style={{ padding: 'var(--space-4)', background: 'var(--bg-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)' }}>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Providers</div>
+            <div style={{ fontSize: '1.25rem', fontWeight: 600 }}>{metrics.providersUsed || 0}</div>
           </div>
-          <div className="stat-card">
-            <div className="stat-card-title">Jobs Found</div>
-            <div className="stat-card-value">{metrics.jobsFound || 0}</div>
+          <div style={{ padding: 'var(--space-4)', background: 'var(--bg-subtle)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)' }}>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Jobs Found</div>
+            <div style={{ fontSize: '1.25rem', fontWeight: 600 }}>{metrics.jobsFound || 0}</div>
           </div>
-          <div className="stat-card" style={{ borderColor: 'rgba(63, 185, 80, 0.4)' }}>
-            <div className="stat-card-title">Accepted</div>
-            <div className="stat-card-value" style={{ color: 'var(--success-text)' }}>{metrics.accepted || 0}</div>
+          <div style={{ padding: 'var(--space-4)', background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: 'var(--radius-md)' }}>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Accepted</div>
+            <div style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--success-text)' }}>{metrics.accepted || 0}</div>
           </div>
-          <div className="stat-card" style={{ borderColor: 'rgba(248, 81, 73, 0.4)' }}>
-            <div className="stat-card-title">Rejected</div>
-            <div className="stat-card-value" style={{ color: 'var(--danger-text)' }}>{metrics.rejected || 0}</div>
+          <div style={{ padding: 'var(--space-4)', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: 'var(--radius-md)' }}>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Rejected</div>
+            <div style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--danger-text)' }}>{metrics.rejected || 0}</div>
           </div>
         </div>
       )}
 
       <div style={{ 
-        padding: '1rem', 
-        borderRadius: '12px',
-        maxHeight: '500px',
+        padding: 'var(--space-3)', 
+        borderRadius: 'var(--radius-lg)',
+        maxHeight: '400px',
         overflowY: 'auto',
-        border: '1px solid var(--border-color)',
-        backgroundColor: 'var(--bg-color)',
-        boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.2)'
+        border: '1px solid var(--border-subtle)',
+        backgroundColor: 'var(--bg-card)',
+        boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.1)'
       }}>
-        {events.length === 0 && <div className="empty-state-card" style={{ border: 'none', padding: '2rem' }}><p>Waiting for pipeline events...</p></div>}
+        {events.length === 0 && <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}><p>Waiting for pipeline events...</p></div>}
         
         {events.map((ev, i) => {
           const bg = getEventColor(ev.eventType);
@@ -253,20 +288,14 @@ export default function LiveEventFeed({ runId }: { runId: string }) {
               <div className="event-icon" style={{ backgroundColor: bg + '20', color: bg }}>
                 {getEventIcon(ev.eventType)}
               </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                  <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{ev.eventType}</span>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{new Date(ev.timestamp).toLocaleTimeString()}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                  <span style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{humanizeEventName(ev.eventType)}</span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{new Date(ev.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
                 </div>
-                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                  {ev.payload?.message || `Pipeline reached ${ev.stage}`}
+                <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {ev.payload?.message || (ev.eventType === 'HEARTBEAT' ? 'Waiting for provider response...' : `${humanizeEventName(ev.eventType)} in progress...`)}
                 </div>
-                {ev.entityId && (
-                  <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <span className="badge badge-research" style={{ fontSize: '0.7rem' }}>Entity: {ev.entityId.slice(0, 8)}</span>
-                    {ev.payload?.provider && <span className="badge" style={{ backgroundColor: 'var(--bg-tertiary)', fontSize: '0.7rem' }}>{ev.payload.provider}</span>}
-                  </div>
-                )}
               </div>
             </div>
           );

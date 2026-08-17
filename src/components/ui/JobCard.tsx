@@ -116,46 +116,33 @@ export const JobCard: React.FC<JobCardProps> = ({
 
   return (
     <Card
-      className={className}
+      className={`profile-card ${className}`}
       interactive
       onClick={handleCardClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      style={{ display: 'flex', flexDirection: 'column', height: '100%' }}
+      style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 'var(--space-4)' }}
       aria-label={`${title} at ${company}`}
     >
-      {/* Top row: title + score */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 12 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <h3 style={{
-            margin: '0 0 4px',
-            fontSize: '0.9375rem',
-            fontWeight: 600,
-            color: 'var(--text-primary)',
-            letterSpacing: '-0.01em',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            lineHeight: 1.35,
-          }}>
-            {title}
-          </h3>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            fontSize: '0.8125rem',
-            color: 'var(--text-secondary)',
-          }}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
-            </svg>
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {company}
-            </span>
-          </div>
+      {/* 1. Company & Score Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-3)' }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          fontSize: '0.8125rem',
+          fontWeight: 500,
+          color: 'var(--text-secondary)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em'
+        }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {company}
+          </span>
         </div>
-
         {score !== undefined && (
           <div onClick={stop} style={{ flexShrink: 0 }}>
             <Link href={`/jobs?minScore=${score}`} style={{ textDecoration: 'none' }}>
@@ -165,8 +152,35 @@ export const JobCard: React.FC<JobCardProps> = ({
         )}
       </div>
 
-      {/* Badge row */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+      {/* 2. Job Title */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <h3 style={{
+          margin: 0,
+          fontSize: '1.125rem',
+          fontWeight: 600,
+          color: 'var(--text-primary)',
+          letterSpacing: '-0.01em',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          display: '-webkit-box',
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: 'vertical',
+          lineHeight: 1.4,
+        }}>
+          {title}
+        </h3>
+      </div>
+
+      {/* 3, 4, 5. Badges Row */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+        {decision && decision !== 'PENDING' && (
+          <div onClick={stop}>
+            <Link href={`/jobs?decision=${encodeURIComponent(decision)}`} style={{ textDecoration: 'none' }}>
+              <StatusBadge status={decisionLabel(decision)} variant={decisionVariant(decision)} />
+            </Link>
+          </div>
+        )}
+        
         {salaryMin !== undefined && salaryMax !== undefined && (
           <div onClick={stop}>
             <Link href={`/jobs?salaryMin=${salaryMin}&salaryMax=${salaryMax}`} style={{ textDecoration: 'none' }}>
@@ -204,15 +218,6 @@ export const JobCard: React.FC<JobCardProps> = ({
           </div>
         )}
 
-        {decision && decision !== 'PENDING' && (
-          <div onClick={stop}>
-            <Link href={`/jobs?decision=${encodeURIComponent(decision)}`} style={{ textDecoration: 'none' }}>
-              <StatusBadge status={decisionLabel(decision)} variant={decisionVariant(decision)} />
-            </Link>
-          </div>
-        )}
-
-        {/* Application Readiness — B5 (D1.4) */}
         {readiness && (
           <div onClick={stop}>
             <Link href={`/jobs/${id}`} style={{ textDecoration: 'none' }}>
@@ -221,7 +226,6 @@ export const JobCard: React.FC<JobCardProps> = ({
           </div>
         )}
 
-        {/* Company Opportunity — B3 (D1.4) */}
         {companyOpportunity && (
           <div onClick={stop}>
             <Link href={`/jobs/${id}`} style={{ textDecoration: 'none' }}>
@@ -231,26 +235,34 @@ export const JobCard: React.FC<JobCardProps> = ({
         )}
       </div>
 
-      {/* Candidate Decision Reason */}
+      {/* 6. Candidate Decision Reason */}
       {primaryReason && (
-        <div style={{ marginBottom: 16, fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-          <strong>Decision:</strong> {primaryReason}
+        <div style={{ 
+          fontSize: '0.8125rem', 
+          color: 'var(--text-secondary)',
+          background: 'var(--bg-subtle)',
+          padding: 'var(--space-3)',
+          borderRadius: 'var(--radius-sm)',
+          borderLeft: '2px solid var(--accent)',
+          lineHeight: 1.5,
+        }}>
+          <strong>Reason:</strong> {primaryReason}
         </div>
       )}
 
-      {/* Footer row */}
+      {/* 7 & 8. Footer row: Metadata & Actions */}
       <div style={{
         marginTop: 'auto',
-        paddingTop: 12,
-        borderTop: '1px solid var(--border-hairline)',
+        paddingTop: 'var(--space-3)',
+        borderTop: '1px solid var(--border-subtle)',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        gap: 8,
-        opacity: isHovered ? 1 : 0.65,
-        transition: 'opacity 0.2s ease',
+        gap: 'var(--space-2)',
+        opacity: isHovered ? 1 : 0.7,
+        transition: 'var(--transition-fast)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
           {age && (
             <span style={{
               fontSize: '0.75rem',
@@ -259,19 +271,19 @@ export const JobCard: React.FC<JobCardProps> = ({
               alignItems: 'center',
               gap: 4,
             }}>
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
               </svg>
               {age}
             </span>
           )}
-          {/* Confidence — subtle footer signal (D1.4) */}
           {confidence != null && confidence > 0 && (
             <span
               style={{
                 fontSize: '0.6875rem',
                 color: 'var(--text-muted)',
                 fontVariantNumeric: 'tabular-nums',
+                fontWeight: 500,
               }}
               aria-label={`Confidence: ${confidence}%`}
             >
