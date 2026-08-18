@@ -33,9 +33,13 @@ export class SearchEngineProvider extends BaseProvider {
     
     // Simulating search using AGY unstructured fetch
     // Real implementation would probably use a SerpAPI or similar.
-    // For now we lean on AGY's internal web search capabilities by asking it to find jobs.
-    const prompt = `Find recent job postings for ${context.targetRoles.join(' or ')} in ${context.location || 'Anywhere'}. 
-    Return the raw contents of the search results or job boards you find.`;
+    // We now use a structured, highly targeted DORK query rather than a generic prompt
+    // to strictly enforce less-visible discovery.
+    const prompt = `Act as an expert technical recruiter executing a highly targeted search. Execute the following search query to discover job postings:
+
+QUERY: ${query}
+    
+Return the raw contents, links, and job details you discover from these targeted sources. DO NOT fallback to generic job boards like Indeed or LinkedIn unless the query explicitly requests them.`;
 
     try {
       let unstructuredText = await runAgyUnstructured({ prompt });
@@ -86,9 +90,23 @@ export class SearchEngineProvider extends BaseProvider {
   }
 
   private buildSearchQuery(context: DiscoveryContext): string {
-    const roles = context.targetRoles.join(' OR ');
-    const location = context.location ? `"${context.location}"` : '';
+    const roles = `(${context.targetRoles.map(r => `"${r}"`).join(' OR ')})`;
+    const location = context.location && !context.remoteOnly ? `"${context.location}"` : '';
     const remote = context.remoteOnly ? '"remote"' : '';
-    return `${roles} ${location} ${remote} job postings`;
+    const skills = context.requiredSkills && context.requiredSkills.length > 0 
+      ? `(${context.requiredSkills.slice(0,3).map(s => `"${s}"`).join(' AND ')})` 
+      : '';
+
+    let siteDorks = '';
+    const strat = context.strategyName?.toLowerCase() || '';
+
+    // Targeted ATS / Stealth discovery
+    if (strat.includes('stealth') || strat.includes('startup')) {
+      siteDorks = '(site:jobs.lever.co OR site:boards.greenhouse.io OR site:jobs.ashbyhq.com OR site:boards.eu.greenhouse.io)';
+    } else if (strat.includes('enterprise')) {
+      siteDorks = '(site:myworkdayjobs.com OR site:careers.ibm.com OR site:careers.microsoft.com)';
+    }
+
+    return `${siteDorks} ${roles} ${skills} ${location} ${remote}`.trim().replace(/\s+/g, ' ');
   }
 }

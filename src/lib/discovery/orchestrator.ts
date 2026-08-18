@@ -114,7 +114,9 @@ export async function runDiscovery(runId: string, config: any, abortSignal?: Abo
     targetRoles: config.targetRoles || [],
     alternativeRoles: config.alternativeRoles || [],
     location: config.candidateCountry,
-    remoteOnly: config.remoteRequirement === 'REMOTE_ONLY'
+    remoteOnly: config.remoteRequirement === 'REMOTE_ONLY',
+    strategyName: strategy.name,
+    requiredSkills: config.requiredSkills || []
   };
 
   const discoveryStartTime = Date.now();

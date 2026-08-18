@@ -76,11 +76,15 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
     if (!configRec[0]) throw new Error('Hunt config not found');
     config = configRec[0];
 
+    if (!run.startedAt) {
+      await db.update(schema.runs).set({ startedAt: new Date().toISOString() }).where(eq(schema.runs.id, runId));
+    }
+
     if (!run.profileSnapshot) {
       const profileRec = await db.select().from(schema.profiles).limit(1);
       if (!profileRec[0]) throw new Error('Candidate profile not found');
       profile = profileRec[0];
-      await db.update(schema.runs).set({ profileSnapshot: profile, startedAt: new Date().toISOString() }).where(eq(schema.runs.id, runId));
+      await db.update(schema.runs).set({ profileSnapshot: profile }).where(eq(schema.runs.id, runId));
     } else {
       const snapshot = run.profileSnapshot as Record<string, any>;
       if (snapshot && typeof snapshot === 'object' && 'profileId' in snapshot && 'profile' in snapshot && typeof snapshot.profile === 'object') {

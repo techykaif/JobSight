@@ -5,6 +5,7 @@ import * as schema from '@/lib/db/schema';
 import crypto from 'crypto';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
+import { missionManager } from '@/lib/pipeline/missionManager';
 
 // Exported so page.tsx can type the useActionState state parameter
 export type HuntFormState = { error: string } | null;
@@ -216,6 +217,11 @@ export async function saveHuntConfig(
       profileSnapshot,
       createdAt: now,
       updatedAt: now,
+    });
+    
+    // Automatically start the mission to avoid second click
+    missionManager.start(runId).catch(err => {
+      console.error('Failed to auto-start mission:', err);
     });
   } catch (e: any) {
     return { error: `Failed to save hunt configuration: ${e.message}` };

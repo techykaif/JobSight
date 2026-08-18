@@ -220,11 +220,25 @@ export default function LiveEventFeed({
         <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', fontSize: '1.125rem', fontWeight: 600 }}>
           Live Pipeline {connected && statusInfo?.status === 'RUNNING' && <span className="live-pulse"></span>}
         </h3>
-        {elapsed > 0 && (
-          <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
-            Elapsed: {Math.floor(elapsed / 60)}m {elapsed % 60}s
-          </div>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          {statusInfo && ['CREATED', 'RUNNING', 'PAUSED'].includes(statusInfo.status) && (
+            <button 
+              onClick={async () => {
+                try {
+                  await fetch(`/api/runs/${runId}/control`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'CANCEL' }) });
+                } catch (e) {}
+              }} 
+              className="btn btn-sm" 
+              style={{ color: 'var(--danger-text)', border: '1px solid var(--border-subtle)', background: 'var(--bg-subtle)' }}>
+              Stop / Cancel Hunt
+            </button>
+          )}
+          {elapsed > 0 && (
+            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+              Elapsed: {Math.floor(elapsed / 60)}m {elapsed % 60}s
+            </div>
+          )}
+        </div>
       </div>
 
       {statusInfo && (

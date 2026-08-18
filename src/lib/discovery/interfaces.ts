@@ -20,6 +20,8 @@ export interface DiscoveryContext {
   location?: string;
   remoteOnly?: boolean;
   maximumResults?: number;
+  strategyName?: string;
+  requiredSkills?: string[];
 }
 
 export interface DiscoveredJob {

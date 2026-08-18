@@ -213,8 +213,6 @@ export default async function HuntDetailPage({ params }: { params: Promise<{ id:
         <Link href="/hunts" className="btn btn-secondary">Back to Hunts</Link>
       </div>
 
-      {!isCompleted && <RunControls runId={run.id} initialStatus={run.status} />}
-
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-8)', background: 'var(--bg-subtle)', padding: 'var(--space-5)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-subtle)' }}>
         <div>
           <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Run Duration</div>
@@ -225,12 +223,12 @@ export default async function HuntDetailPage({ params }: { params: Promise<{ id:
           <div style={{ fontSize: '1.5rem', fontWeight: 600 }}>{observationsCount.c}</div>
         </div>
         <div>
-          <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Accepted</div>
+          <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Considered</div>
           <div style={{ fontSize: '1.5rem', fontWeight: 600, color: 'var(--success-text)' }}>{accepted}</div>
         </div>
         <div>
-          <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Rejected</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 600, color: 'var(--danger-text)' }}>{rejected}</div>
+          <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Skipped</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 600, color: 'var(--text-muted)' }}>{rejected}</div>
         </div>
       </div>
 
