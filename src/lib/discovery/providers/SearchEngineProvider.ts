@@ -38,7 +38,39 @@ export class SearchEngineProvider extends BaseProvider {
     Return the raw contents of the search results or job boards you find.`;
 
     try {
-      const unstructuredText = await runAgyUnstructured({ prompt });
+      let unstructuredText = await runAgyUnstructured({ prompt });
+
+      const urlRegex = /https:\/\/vertexaisearch\.cloud\.google\.com\/[^\s)\]'"]+/g;
+      const urls = [...new Set(unstructuredText.match(urlRegex) || [])];
+
+      if (urls.length > 0) {
+        console.log(`[SearchEngineProvider] Resolving ${urls.length} Vertex AI redirects...`);
+        const resolveUrl = async (url: string) => {
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            // using GET but we don't consume the body.
+            const res = await fetch(url, { redirect: 'follow', signal: controller.signal });
+            clearTimeout(timeoutId);
+            return { original: url, resolved: res.url };
+          } catch (e) {
+            console.warn(`[SearchEngineProvider] Failed to resolve redirect ${url}`, (e as Error).message);
+            return { original: url, resolved: url };
+          }
+        };
+
+        const batchSize = 5;
+        for (let i = 0; i < urls.length; i += batchSize) {
+          const batch = urls.slice(i, i + batchSize);
+          const resolutions = await Promise.all(batch.map(u => resolveUrl(u)));
+          for (const res of resolutions) {
+            if (res.resolved && res.resolved !== res.original && !res.resolved.includes('vertexaisearch.cloud.google.com')) {
+              unstructuredText = unstructuredText.split(res.original).join(res.resolved);
+            }
+          }
+        }
+      }
+
       return {
         jobs: [], // Search engines don't structure jobs directly; they rely on Stage B
         unstructuredText,

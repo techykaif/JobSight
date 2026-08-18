@@ -39,7 +39,7 @@ export function normalizeTitle(title: string): string {
 
 export async function persistCandidateJob(runId: string, candidate: CandidateJob) {
   const normalizedName = candidate.company.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-  const companyId = crypto.randomUUID(); 
+  const companyId = crypto.randomUUID();
 
   // 1. Upsert Company
   const company = await repos.upsertCompany({
@@ -65,6 +65,41 @@ export async function persistCandidateJob(runId: string, candidate: CandidateJob
       .limit(1).get();
     if (srcMatch) {
       existingJob = await db.select().from(schema.jobs).where(eq(schema.jobs.id, srcMatch.jobId)).limit(1).get();
+    }
+  }
+
+  // Fallback to Composite Identity (Company + Title + Location)
+  if (!existingJob) {
+    const potentialMatches = await db.select().from(schema.jobs).where(and(
+      eq(schema.jobs.companyId, company.id),
+      eq(schema.jobs.normalizedTitle, normalizedTitle)
+    )).all();
+
+    for (const match of potentialMatches) {
+      if (!match.location || !candidate.job.location) continue;
+
+      const matchLoc = match.location.toLowerCase().trim();
+      const candLoc = candidate.job.location.toLowerCase().trim();
+
+      if (matchLoc === candLoc) {
+        // Verify externalJobId does not explicitly conflict
+        let matchExternalJobId: string | null | undefined = null;
+        const matchSrc = await db.select().from(schema.jobSources).where(eq(schema.jobSources.jobId, match.id)).limit(1).get();
+        if (matchSrc && matchSrc.externalJobId) {
+          matchExternalJobId = matchSrc.externalJobId;
+        }
+
+        const candExtId = candidate.job.externalJobId || undefined;
+        const matchExtId = matchExternalJobId || undefined;
+
+        if (matchExtId !== candExtId) {
+          // Explicit conflict or ambiguity -> Different requisition
+          continue;
+        }
+
+        existingJob = match;
+        break;
+      }
     }
   }
 
@@ -141,7 +176,7 @@ export async function persistCandidateJob(runId: string, candidate: CandidateJob
         eq(schema.jobs.companyId, company.id),
         eq(schema.jobs.normalizedTitle, normalizedTitle)
       ));
-    
+
     const oldMatches = potentialMatches.filter(p => p.id !== job.id);
     if (oldMatches.length > 0) {
       await emitEvent({
@@ -172,7 +207,7 @@ export async function persistCandidateJob(runId: string, candidate: CandidateJob
   const sourceIdMap = new Map<string, string>();
   for (const src of (candidate.sources || [])) {
     const srcId = crypto.randomUUID();
-    
+
     // Attempt to parse existing or just insert
     // Multiple observations can insert duplicate sources, we just append or we can upsert by URL
     // For simplicity, we just save the source observation to job_sources

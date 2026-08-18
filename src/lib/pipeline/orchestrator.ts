@@ -13,8 +13,8 @@ import type { DiscoveryIntelligenceContext } from '../discovery-intelligence/int
 import { runApplicationIntelligence, persistApplicationIntelligence } from '../application-intelligence/index.js';
 import type { ApplicationIntelligenceContext } from '../application-intelligence/interfaces.js';
 import { CandidateProfileSchema, type CandidateProfile } from '../qualification/schema';
+import { checkDiscoveryUrlSafety } from '../discovery/url-safety.js';
 import crypto from 'crypto';
-
 export async function runMission(runId: string, abortSignal: AbortSignal, isPauseRequested: () => boolean) {
   let config: any;
   let profile: any;
@@ -32,7 +32,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
     if (isPauseRequested()) {
       await updateState('PAUSED', 'PAUSED');
       await emitEvent({ runId, type: 'RUN_PAUSED', stage: 'PAUSED', message: 'Mission paused.' });
-      
+
       // We block here checking periodically if we are unpaused or aborted.
       // This is a cooperative pause loop.
       while (isPauseRequested() && !abortSignal.aborted) {
@@ -43,7 +43,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
         await emitEvent({ runId, type: 'RUN_CANCELLED', stage: 'ABORTED', message: 'Mission was cancelled.' });
         throw new Error('Mission Cancelled');
       }
-      
+
       await updateState('RUNNING', 'RESUMED');
       await emitEvent({ runId, type: 'RUN_RESUMED', stage: 'RESUMED', message: 'Mission resumed.' });
     }
@@ -53,7 +53,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
     const runRec = await db.select().from(schema.runs).where(eq(schema.runs.id, runId)).limit(1);
     if (!runRec[0]) throw new Error('Run not found');
     const run = runRec[0];
-    
+
     // Determine start stage based on checkpoint
     const lastCp = run.lastCheckpoint;
     const skipPreflight = ['PREFLIGHT_COMPLETED', 'DISCOVERY_COMPLETED', 'QUALIFICATION_COMPLETED', 'COMPANY_RESEARCH_COMPLETED', 'FOUNDATION_COMPLETED', 'COMPETITION_COMPLETED', 'COMPANY_OPPORTUNITY_COMPLETED', 'DISCOVERY_INTELLIGENCE_COMPLETED', 'APPLICATION_INTELLIGENCE_COMPLETED'].includes(lastCp || '');
@@ -92,7 +92,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
         profile = snapshot;
       }
     }
-    
+
     let validProfile: CandidateProfile;
     try {
       validProfile = CandidateProfileSchema.parse(profile);
@@ -115,7 +115,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
       await db.update(schema.runs).set({ lastCheckpoint: 'PREFLIGHT_COMPLETED' }).where(eq(schema.runs.id, runId));
       await emitEvent({ runId, type: 'PREFLIGHT_COMPLETED', stage: 'PREFLIGHT' });
     }
-    
+
     await checkPauseOrCancel();
 
     // DISCOVERY & INGESTION
@@ -124,11 +124,11 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
       await emitEvent({ runId, type: 'DISCOVERY_STARTED', stage: 'DISCOVERY', message: 'Starting job discovery' });
 
       const ingestionResult = await runIngestionPipeline(runId, config, abortSignal);
-      
+
       await db.update(schema.runs).set({ lastCheckpoint: 'DISCOVERY_COMPLETED' }).where(eq(schema.runs.id, runId));
-      await emitEvent({ 
-        runId, 
-        type: 'DISCOVERY_BATCH_COMPLETED', 
+      await emitEvent({
+        runId,
+        type: 'DISCOVERY_BATCH_COMPLETED',
         stage: 'DISCOVERY',
         payload: ingestionResult,
         message: `Discovery complete. Found ${ingestionResult.discovered}, valid ${ingestionResult.valid}`
@@ -153,7 +153,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
         const existingDec = await db.select().from(schema.decisions).where(eq(schema.decisions.jobId, job.id)).limit(1);
         const qualifyFailures = runFailures.filter(f => f.stage === 'QUALIFY' && f.entityId === job.id);
         const exhausted = qualifyFailures.length >= 2; // max 2 cross-run retries
-        
+
         if (existingDec.length === 0 && !exhausted) {
           jobsToQualify.push({ job, attempts: qualifyFailures.length });
         }
@@ -174,10 +174,53 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
 
         await checkPauseOrCancel();
         try {
-          const artifactRes = await db.select().from(schema.researchArtifacts).where(eq(schema.researchArtifacts.entityId, job.id)).limit(1);
-          const sourceRes = await db.select().from(schema.jobSources).where(eq(schema.jobSources.jobId, job.id)).limit(1);
-          const artifact = artifactRes[0];
-          const source = sourceRes[0];
+          let artifactRes = await db.select().from(schema.researchArtifacts).where(eq(schema.researchArtifacts.entityId, job.id)).limit(1);
+          let sourceRes = await db.select().from(schema.jobSources).where(eq(schema.jobSources.jobId, job.id)).limit(1);
+          let artifact = artifactRes[0];
+          let source = sourceRes[0];
+
+          // JUST-IN-TIME SOURCE VERIFICATION
+          if (source && source.sourceUrl && !source.httpStatus) {
+            const safetyCheck = checkDiscoveryUrlSafety(source.sourceUrl);
+            if (safetyCheck.safe) {
+              try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+                const res = await fetch(source.sourceUrl, { signal: controller.signal });
+                clearTimeout(timeoutId);
+
+                source.httpStatus = res.status;
+                source.retrievedAt = new Date().toISOString();
+
+                await db.update(schema.jobSources)
+                  .set({ httpStatus: res.status, retrievedAt: source.retrievedAt })
+                  .where(eq(schema.jobSources.id, source.id));
+
+                if (res.ok) {
+                  const text = await res.text();
+                  if (text && text.trim().length > 0) {
+                    await db.insert(schema.researchArtifacts).values({
+                      id: crypto.randomUUID(),
+                      runId,
+                      entityType: 'JOB',
+                      entityId: job.id,
+                      workerType: 'SOURCE_VERIFICATION',
+                      rawContent: text,
+                      createdAt: new Date().toISOString()
+                    });
+
+                    // Reload artifact
+                    artifactRes = await db.select().from(schema.researchArtifacts).where(eq(schema.researchArtifacts.entityId, job.id)).limit(1);
+                    artifact = artifactRes[0];
+                  }
+                }
+              } catch (e) {
+                console.warn(`[QUALIFY] Failed to verify source ${source.sourceUrl}`, (e as Error).message);
+              }
+            } else {
+              console.warn(`[QUALIFY] Unsafe URL bypassed verification: ${source.sourceUrl} - ${safetyCheck.reason}`);
+            }
+          }
 
           const hasArtifact = !!artifact && !!artifact.rawContent && artifact.rawContent.trim().length > 0;
           const hasSuccessfulFetch = source && source.httpStatus !== null && source.httpStatus >= 200 && source.httpStatus < 300;
@@ -195,7 +238,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
           } else {
             qResult = await qualifyJob(job, config, validProfile, abortSignal);
           }
-          
+
           await db.insert(schema.decisions).values({
             id: crypto.randomUUID(),
             runId,
@@ -242,7 +285,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
 
         } catch (err: any) {
           if (err.message === 'Mission Cancelled' || err.name === 'AbortError') throw err;
-          
+
           const newAttemptCount = attempts + 1;
           const retryable = true;
 
@@ -261,7 +304,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
 
           if (newAttemptCount >= 2) {
             await emitEvent({ runId, type: 'RETRY_EXHAUSTED', stage: 'QUALIFY', entityType: 'JOB', entityId: job.id, message: `Retry exhausted for qualification: ${job.canonicalTitle} - ${err.message}` });
-            
+
             await db.insert(schema.decisions).values({
               id: crypto.randomUUID(),
               runId,
@@ -293,7 +336,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
     if (!skipCompanyResearch) {
       const activeDecisions = await db.select().from(schema.decisions)
         .where(inArray(schema.decisions.decision, ['APPLY', 'CONSIDER', 'RESEARCH_REQUIRED']));
-      
+
       const runJobs = await db.select({ job: schema.jobs }).from(schema.jobObservations)
         .innerJoin(schema.jobs, eq(schema.jobObservations.jobId, schema.jobs.id))
         .where(eq(schema.jobObservations.runId, runId));
@@ -306,11 +349,11 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
       for (const d of runDecisions) {
         const job = runJobs.find(rj => rj.job.id === d.jobId)?.job;
         if (!job || !job.companyId) continue;
-        
+
         const existingScores = await db.select().from(schema.scores)
           .where(eq(schema.scores.jobId, job.id));
         if (existingScores.some(s => s.scoreType === 'COMPANY_SCORE' && s.runId === runId)) {
-          continue; 
+          continue;
         }
 
         const compFailures = runFailures.filter(f => f.stage === 'COMPANY' && f.entityId === job.companyId);
@@ -328,7 +371,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
 
       for (const { d, job, existingScores, attempts } of companiesToResearch) {
         await checkPauseOrCancel();
-        
+
         const compRec = await db.select().from(schema.companies).where(eq(schema.companies.id, job.companyId!)).limit(1);
         const company = compRec[0];
         if (!company) continue;
@@ -337,7 +380,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
 
         try {
           const cResult = await getCompanyIntelligence(job, company.displayName, oppV1, d.decision, false, abortSignal);
-          
+
           if (cResult.decision !== d.decision) {
             await db.update(schema.decisions).set({ decision: cResult.decision }).where(eq(schema.decisions.id, d.id));
           }
@@ -419,7 +462,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
 
       for (const { job } of runJobs) {
         await checkPauseOrCancel();
-        
+
         let company = undefined;
         if (job.companyId) {
           const compRec = await db.select().from(schema.companies).where(eq(schema.companies.id, job.companyId)).limit(1);
@@ -470,7 +513,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
 
       for (const { job } of runJobs) {
         await checkPauseOrCancel();
-        
+
         let company = undefined;
         if (job.companyId) {
           const compRec = await db.select().from(schema.companies).where(eq(schema.companies.id, job.companyId)).limit(1);
@@ -480,7 +523,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
         const evidenceItemsRaw = await db.select().from(schema.evidenceItems)
           .innerJoin(schema.opportunityEvidence, eq(schema.evidenceItems.opportunityEvidenceId, schema.opportunityEvidence.id))
           .where(eq(schema.opportunityEvidence.jobId, job.id));
-        
+
         const foundationEvidence = evidenceItemsRaw.map(row => ({
           id: row.evidence_items.id,
           title: row.evidence_items.title,
@@ -492,12 +535,12 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
           source: row.evidence_items.source || 'unknown',
           timestamp: row.evidence_items.timestamp,
           category: row.evidence_items.category as any,
-          metadata: row.evidence_items.metadata ? JSON.parse(String(row.evidence_items.metadata)) : undefined
+          metadata: row.evidence_items.metadata ? (typeof row.evidence_items.metadata === 'string' ? JSON.parse(row.evidence_items.metadata) : row.evidence_items.metadata) : undefined
         }));
 
         const foundationSignalsRec = await db.select().from(schema.observableSignals)
           .where(eq(schema.observableSignals.jobId, job.id));
-        
+
         const foundationSignals = foundationSignalsRec.map(s => ({
           type: s.signalType,
           value: s.observedValue
@@ -705,9 +748,9 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
       await emitEvent({ runId, type: 'DISCOVERY_INTELLIGENCE_STARTED', stage: 'DISCOVERY_INTELLIGENCE' });
 
       // Load all job observations for this run
-      const runJobs = await db.select({ 
-        job: schema.jobs, 
-        company: schema.companies, 
+      const runJobs = await db.select({
+        job: schema.jobs,
+        company: schema.companies,
         observation: schema.jobObservations,
         source: schema.jobSources
       }).from(schema.jobObservations)
@@ -729,7 +772,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
         // get comp
         const comp = await db.select().from(schema.competitionResults).where(eq(schema.competitionResults.jobId, job.id)).limit(1);
         const competitionResult = comp[0] ? comp[0] : undefined;
-        
+
         // get company opp
         let companyOpportunityResult = undefined;
         if (company) {
@@ -745,7 +788,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
           foundationSignals,
           similarJobsInRun
         };
-        
+
         if (company) context.company = company;
         if (source) context.source = source;
         if (competitionResult) context.competitionResult = competitionResult as any;
@@ -783,8 +826,8 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
       await updateState('RUNNING', 'APPLICATION_INTELLIGENCE');
       await emitEvent({ runId, type: 'APPLICATION_INTELLIGENCE_STARTED', stage: 'APPLICATION_INTELLIGENCE' });
 
-      const runJobs = await db.select({ 
-        job: schema.jobs, 
+      const runJobs = await db.select({
+        job: schema.jobs,
         company: schema.companies
       }).from(schema.jobObservations)
         .innerJoin(schema.jobs, eq(schema.jobObservations.jobId, schema.jobs.id))
@@ -813,7 +856,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
         // get comp
         const comp = await db.select().from(schema.competitionResults).where(eq(schema.competitionResults.jobId, job.id)).limit(1);
         const competitionResult = comp[0] ? comp[0] : undefined;
-        
+
         // get company opp
         let companyOpportunityResult = undefined;
         if (company) {
@@ -829,7 +872,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
           job,
           runId
         };
-        
+
         if (company) context.company = company;
         if (candidateProfile) context.candidateProfile = candidateProfile;
         if (qualificationScore !== undefined) context.qualificationScore = qualificationScore;
@@ -982,7 +1025,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
 
     // 5. Candidate Decision Intelligence (D1.7.5)
     await updateState('CANDIDATE_DECISION', 'DECISION');
-    
+
     const { evaluateCandidateDecision } = await import('../candidate-decision/engine.js');
     const b7Results = await db.select().from(schema.decisionResults).where(eq(schema.decisionResults.runId, runId));
     const fitResults = await db.select().from(schema.candidateFitResults).where(eq(schema.candidateFitResults.runId, runId));
@@ -991,7 +1034,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
     for (const job of validJobsMap.values()) {
       const b7Dec = b7Results.find(r => r.jobId === job.id);
       const fit = fitResults.find(r => r.jobId === job.id);
-      
+
       const geoEligibility = {
         eligibilityStatus: job.candidateRemoteEligibility as 'ELIGIBLE' | 'NOT_ELIGIBLE' | 'NEEDS_VERIFICATION' | undefined,
         remoteScope: job.geographicRemoteScope as any,
@@ -1028,14 +1071,14 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
     // FINISH
     const finalFailures = await db.select().from(schema.failures).where(eq(schema.failures.runId, runId));
     const unrecoveredFailures = finalFailures.filter(f => f.attempt >= 2 || !f.retryable);
-    
+
     let finalStatus = 'COMPLETED';
     if (finalFailures.length > 0) {
       const runJobs = await db.select().from(schema.jobObservations).where(eq(schema.jobObservations.runId, runId));
       const finalDecisions = await db.select().from(schema.decisions).where(eq(schema.decisions.runId, runId));
-      
+
       const successfulDecisions = finalDecisions.filter(d => d.decision !== 'FAILED');
-      
+
       if (runJobs.length > 0 && successfulDecisions.length === 0) {
         finalStatus = 'FAILED';
       } else {
@@ -1046,7 +1089,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
     await updateState(finalStatus, 'FINISHED');
     await db.update(schema.runs).set({ completedAt: new Date().toISOString() }).where(eq(schema.runs.id, runId));
     await emitEvent({ runId, type: 'RUN_COMPLETED', stage: 'FINISH', message: `Mission finished with status: ${finalStatus}` });
-    
+
   } catch (error: any) {
     if (error.message === 'Mission Cancelled' || error.name === 'AbortError') {
       console.log(`[ORCHESTRATOR] Mission ${runId} cancelled cleanly.`);
