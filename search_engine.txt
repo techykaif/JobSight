@@ -1,0 +1,94 @@
+
+
+--- Source: SEARCH_ENGINE ---
+
+Here is the curated list of targeted job opportunities sourced directly from primary applicant tracking systems (**Greenhouse**, **Ashby**, and **Lever**) matching your exact boolean criteria:
+
+---
+
+### **Targeted ATS Job Postings**
+
+#### **1. Senior Software Engineer – Frontend / React**
+* **Company:** Close
+* **ATS Source:** [Lever Application Link](https://jobs.lever.co/close/6e5f3c2c-8027-4c31-9f22-21147a408799)
+* **Location:** 100% Remote (USA)
+* **Core Tech Stack:** TypeScript, JavaScript, React, Vite, Vitest, Playwright, WebSockets / WebRTC
+* **Role Summary:** Building and maintaining a real-time single-page application (SPA), developing modular UI components, maintaining a custom design system, and optimizing WebSocket/WebRTC client-side streaming.
+
+---
+
+#### **2. Principal Software Engineer**
+* **Company:** Endgame
+* **ATS Source:** [Greenhouse Application Link](https://boards.greenhouse.io/endgame/jobs/4553205005)
+* **Location:** Remote (US)
+* **Core Tech Stack:** TypeScript, React, tRPC, Node.js, AI / LLM Integrations
+* **Role Summary:** Leading architecture in an AI-native product environment. Responsibilities span building React frontend components, designing robust tRPC/API endpoints, and architecting scalable web application foundations.
+
+---
+
+#### **3. Fullstack Software Engineer**
+* **Company:** Paloma Health
+* **ATS Source:** [Greenhouse Application Link](https://boards.greenhouse.io/palomahealth)
+* **Location:** Remote (US)
+* **Core Tech Stack:** React, TypeScript, JavaScript, C# / Node.js
+* **Role Summary:** Developing complex, user-centric healthcare interfaces with ReactJS and TypeScript, paired with full-stack API integration and asynchronous workflows.
+
+---
+
+#### **4. Senior Front End Software Engineer**
+* **Company:** Anduril Industries
+* **ATS Source:** [Greenhouse Application Link](https://boards.greenhouse.io/andurilindustries)
+* **Location:** Remote (US, up to 25% travel)
+* **Core Tech Stack:** React, TypeScript, JavaScript, Modern Web APIs
+* **Role Summary:** Developing mission-critical, low-latency web interfaces and command-and-control tooling for Lattice OS utilizing TypeScript and React.
+
+---
+
+#### **5. Senior Software Engineer – Full Stack**
+* **Company:** Pearly
+* **ATS Source:** [Ashby Application Link](https://jobs.ashbyhq.com/pearly/054a101b-c6b0-466d-b892-72186851253e)
+* **Location:** Remote (US)
+* **Core Tech Stack:** TypeScript (strict mode), React, GraphQL, Serverless Functions, PostgreSQL
+* **Role Summary:** Driving full-lifecycle product development across a modern React frontend and serverless TypeScript backend, handling financial workflows and data pipelines.
+
+---
+
+#### **6. Software Engineer, Fullstack (UI)**
+* **Company:** Tamnoon Inc.
+* **ATS Source:** [Greenhouse / Ashby Application Link](https://boards.greenhouse.io/tamnoon/jobs/5623005003)
+* **Location:** Remote
+* **Core Tech Stack:** TypeScript, JavaScript, React, Node.js
+* **Role Summary:** Delivering end-to-end cloud security features with emphasis on complex UI workflows, responsive state management, and Node/TypeScript services.
+
+---
+
+#### **7. Software Engineer (Full Stack)**
+* **Company:** Discern Inc.
+* **ATS Source:** [Ashby Application Link](https://jobs.ashbyhq.com/discern)
+* **Location:** Remote (US)
+* **Core Tech Stack:** React, TypeScript, Go, Modern Cloud Services
+* **Role Summary:** Building distributed enterprise workflows, bridging reactive frontends in TypeScript/React with high-throughput Go backend services.
+
+---
+
+#### **8. Software Engineer – Frontend**
+* **Company:** Luminary
+* **ATS Source:** [Greenhouse Application Link](https://boards.greenhouse.io/luminary/jobs/4237149005)
+* **Location:** Remote
+* **Core Tech Stack:** React, TypeScript, JavaScript, Apollo GraphQL
+* **Role Summary:** Building modular client-side architecture and data-driven dashboards using Apollo Client, TypeScript, and React.
+
+---
+
+#### **9. Software Engineer – TypeScript / Full Stack**
+* **Company:** Warren
+* **ATS Source:** [Ashby Application Link](https://jobs.ashbyhq.com/warren/1202e86d-304b-4b1e-9273-04e463a5639b)
+* **Location:** Remote / Hybrid
+* **Core Tech Stack:** React / React Native, TypeScript, Tailwind CSS, NestJS, Drizzle ORM
+* **Role Summary:** Cross-platform web and mobile feature delivery in a unified TypeScript ecosystem across the entire stack.
+
+---
+
+### **Recruiter Search Insights**
+* **Common Backend Complements:** Positions requiring React + TypeScript strongly correlate with **Node.js/tRPC**, **Go**, or **GraphQL (Apollo)**.
+* **Architecture Trends:** High demand for candidates with experience in strict typing, component libraries / custom design systems, and client-side performance tooling (e.g., Vite, Playwright).

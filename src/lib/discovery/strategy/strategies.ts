@@ -19,11 +19,11 @@ export class StealthStrategy extends BaseStrategy {
   name = 'Stealth Strategy';
   version = '1.0.0';
 
-  getConfiguration(): StrategyConfiguration {
+  getConfiguration(huntConfig?: any): StrategyConfiguration {
     return {
-      maxUsableOpportunities: 3, // Very focused
-      maxBudgetMs: 120000, // Higher budget because we dig deeper
-      maxProviderRuntimeMs: 30000
+      maxUsableOpportunities: huntConfig?.maximumUsableResults ?? 3, // Very focused
+      maxBudgetMs: huntConfig?.maximumRuntime ?? 120000, // Higher budget because we dig deeper
+      maxProviderRuntimeMs: huntConfig?.maximumRuntime ?? 30000
     };
   }
 

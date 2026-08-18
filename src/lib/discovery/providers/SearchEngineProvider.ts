@@ -35,11 +35,20 @@ export class SearchEngineProvider extends BaseProvider {
     // Real implementation would probably use a SerpAPI or similar.
     // We now use a structured, highly targeted DORK query rather than a generic prompt
     // to strictly enforce less-visible discovery.
-    const prompt = `Act as an expert technical recruiter executing a highly targeted search. Execute the following search query to discover job postings:
+    const prompt = `Execute the following search query to discover job postings:
 
 QUERY: ${query}
     
-Return the raw contents, links, and job details you discover from these targeted sources. DO NOT fallback to generic job boards like Indeed or LinkedIn unless the query explicitly requests them.`;
+Return the raw contents, links, and job details you discover from these targeted sources. DO NOT fallback to generic job boards like Indeed or LinkedIn unless the query explicitly requests them.
+
+CRITICAL URL REQUIREMENTS:
+- You must provide the EXACT, full absolute URL to the concrete job posting.
+- Do NOT provide a generic ATS root domain (e.g. no "https://boards.greenhouse.io").
+- Do NOT provide a company homepage or careers landing page.
+- Do NOT rewrite, abbreviate, or summarize the URLs.
+- If an exact job posting URL is unavailable for a candidate, do NOT invent one; omit the URL or omit the candidate.
+- One exact URL per discovered posting.
+- Prefer a compact structured format. Do NOT generate a conversational recruiter-style narrative. Focus purely on machine-usable structured discovery data.`;
 
     try {
       let unstructuredText = await runAgyUnstructured({ prompt });

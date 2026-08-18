@@ -41,7 +41,7 @@ export async function runDiscovery(runId: string, config: any, abortSignal?: Abo
 
   const usedFallbackStrategy = !requestedStrategy;
   console.log(`[Discovery] Using strategy: ${strategy.name} (requested: '${strategyName}'${usedFallbackStrategy ? ', fell back to default' : ''})`);
-  const strategyConfig = strategy.getConfiguration();
+  const strategyConfig = strategy.getConfiguration(config);
 
   await repos.saveEvent({
     id: crypto.randomUUID(),

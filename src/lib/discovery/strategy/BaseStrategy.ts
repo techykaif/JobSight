@@ -23,11 +23,11 @@ export abstract class BaseStrategy implements DiscoveryStrategy {
     return { terminate: false };
   }
 
-  getConfiguration(): StrategyConfiguration {
+  getConfiguration(huntConfig?: any): StrategyConfiguration {
     return {
-      maxUsableOpportunities: 5,
-      maxBudgetMs: 60000,
-      maxProviderRuntimeMs: 15000
+      maxUsableOpportunities: huntConfig?.maximumUsableResults ?? 5,
+      maxBudgetMs: huntConfig?.maximumRuntime ?? 60000,
+      maxProviderRuntimeMs: huntConfig?.maximumRuntime ?? 15000
     };
   }
 

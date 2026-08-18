@@ -1,0 +1,74 @@
+
+
+--- Source: SEARCH_ENGINE ---
+
+Here is the targeted ATS sourcing report executed against **Greenhouse (`boards.greenhouse.io`)** and **Ashby (`jobs.ashbyhq.com`)** for remote **Software Engineer** roles requiring **JavaScript / TypeScript / React**.
+
+---
+
+### **Executive Sourcing Summary**
+
+| Target Role | Company | ATS Platform | Location / Work Model | Core Stack | Sourcing URL |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Sr. Software Engineer (Tech Lead)** | Bloomerang | Greenhouse | Remote (US) | TypeScript, React, Node.js | [Greenhouse Link](https://boards.greenhouse.io) |
+| **Senior Software Engineer – Frontend** | Close | AshbyHQ | Remote (USA) | TypeScript, React, Vite, Vitest, Playwright | [AshbyHQ Link](https://jobs.ashbyhq.com) |
+| **Software Engineer (Full Stack)** | Discern Inc. | AshbyHQ | Remote (US) | React, TypeScript, Go, Temporal, GKE | [AshbyHQ Link](https://jobs.ashbyhq.com) |
+| **Senior Full-Stack Software Engineer** | Circle.so | Greenhouse | Fully Remote | TypeScript, React, Modern Web APIs | [Greenhouse Link](https://boards.greenhouse.io) |
+| **Fullstack Software Engineer** | Paloma Health | Greenhouse | Fully Remote (US) | React, TypeScript, GraphQL/Node | [Greenhouse Link](https://boards.greenhouse.io) |
+| **Software Engineer - Frontend** | Luminary | AshbyHQ | Remote / NYC | React, TypeScript, GraphQL (Apollo), Playwright | [AshbyHQ Link](https://jobs.ashbyhq.com) |
+| **Senior Software Engineer - Full Stack** | Pearly | AshbyHQ | Remote (US) | TypeScript, React, Cloud Postgres, Terraform | [AshbyHQ Link](https://jobs.ashbyhq.com) |
+| **Software Engineer, Fullstack (UI)** | Tamnoon Inc. | AshbyHQ | Remote | TypeScript, React, Node.js | [AshbyHQ Link](https://jobs.ashbyhq.com) |
+| **Staff Software Engineer** | Federato | Greenhouse | Remote (US) | TypeScript, React, Distributed Backend | [Greenhouse Link](https://boards.greenhouse.io) |
+| **Senior Front End Software Engineer, React** | Anduril Industries | Greenhouse | Remote / Hybrid Options | React, TypeScript, Web Components | [Greenhouse Link](https://boards.greenhouse.io) |
+
+---
+
+### **Detailed Job Profiles & Technical Criteria**
+
+#### 1. **Close — Senior Software Engineer (Frontend / React)**
+* **ATS Source:** `jobs.ashbyhq.com`
+* **Location:** Remote (USA)
+* **Tech Stack:** TypeScript, React, Single Page Architecture, Vite, Vitest, Playwright
+* **Role Summary:** Building high-speed, desktop-grade sales communication SPA. Requires deep knowledge of React state management, web performance optimization, and robust TypeScript typing.
+
+#### 2. **Bloomerang — Sr. Software Engineer (Tech Lead) - TypeScript / React**
+* **ATS Source:** `boards.greenhouse.io`
+* **Location:** Remote (US)
+* **Tech Stack:** TypeScript, React, Modern Component Design Systems, REST/GraphQL
+* **Role Summary:** Leading technical execution and architecture for giving & donor CRM platforms. Mentoring engineers and establishing architectural standards across TypeScript and React codebases.
+
+#### 3. **Discern Inc. — Software Engineer (Full Stack)**
+* **ATS Source:** `jobs.ashbyhq.com`
+* **Location:** Remote (US)
+* **Tech Stack:** React, TypeScript, Go, Temporal, `sqlc`, Kubernetes (GKE)
+* **Role Summary:** End-to-end product delivery building enterprise automation and data-intensive interfaces. Integrates high-performance Go backends with reactive TypeScript/React frontends.
+
+#### 4. **Circle.so — Senior Full-Stack Software Engineer (Discover)**
+* **ATS Source:** `boards.greenhouse.io`
+* **Location:** Fully Remote (Global / US Friendly)
+* **Tech Stack:** React, TypeScript, Full-stack web infrastructure
+* **Role Summary:** Scaling discovery, search, and community engagement features for creator communities. Requires building scalable front-end components and high-throughput backend services.
+
+#### 5. **Pearly — Senior Software Engineer (Full Stack)**
+* **ATS Source:** `jobs.ashbyhq.com`
+* **Location:** Remote (US Hubs: NY, GA, CA)
+* **Tech Stack:** TypeScript, React, PostgreSQL, Serverless Functions, Terraform
+* **Role Summary:** Building automated revenue cycle workflows for healthcare practices. Heavy emphasis on end-to-end type safety across client and serverless boundaries.
+
+#### 6. **Luminary — Software Engineer (Frontend)**
+* **ATS Source:** `jobs.ashbyhq.com`
+* **Location:** Remote (or NYC)
+* **Tech Stack:** React, TypeScript, GraphQL (Apollo Client), Playwright
+* **Role Summary:** Developing consumer and creator-facing audio/media applications with interactive UI components and client-side caching.
+
+#### 7. **Tamnoon Inc. — Software Engineer, Fullstack (UI)**
+* **ATS Source:** `jobs.ashbyhq.com`
+* **Location:** Remote
+* **Tech Stack:** TypeScript, React, Node.js
+* **Role Summary:** Cloud security remediation platform. Designing and shipping UI workflows for cloud security analysts and engineers.
+
+---
+
+### **Recruiter Search Query Execution Notes**
+* **ATS Coverage:** Direct search targeted Greenhouse (`boards.greenhouse.io`), AshbyHQ (`jobs.ashbyhq.com`), and Lever (`jobs.lever.co`).
+* **Filtering Applied:** Roles matched strictly against engineering individual contributor/lead tracks specifying `TypeScript`, `React`, and explicit `Remote` classification.

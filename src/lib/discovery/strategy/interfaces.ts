@@ -26,5 +26,5 @@ export interface DiscoveryStrategy {
   }, config: StrategyConfiguration): { terminate: boolean; reason?: string };
 
   // Generate configurations specific to this strategy
-  getConfiguration(): StrategyConfiguration;
+  getConfiguration(huntConfig?: any): StrategyConfiguration;
 }
