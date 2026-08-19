@@ -38,14 +38,15 @@ export class SearchEngineProvider extends BaseProvider {
     const prompt = `Execute the provided search query. Find actual job postings matching the query:
 ${query}
 
-Return only concrete job posting URLs.
+Return ONLY a JSONL format (one JSON object per line) containing:
+{"url": "exact absolute job posting URL", "title": "job title", "company": "company name", "location": "location if available"}
+
 Return full absolute URLs. Preserve exact URLs.
 Do NOT attempt to run scripts or code to resolve redirect URLs. Just return the raw URLs as you find them.
 Never replace them with ATS root domains.
 Never return company homepages or careers landing pages.
 Never invent URLs. Omit a candidate if an exact job URL cannot be established.
-Return one URL per line.
-No Markdown, no bullets, no commentary, no explanations, no tables.`;
+No Markdown, no conversational text, no explanations, no recruiter summaries. Just the JSONL objects.`;
 
     try {
       let unstructuredText = await runAgyUnstructured({ prompt });

@@ -16,10 +16,10 @@ describe('Targeted Discovery Fixes', () => {
       const fs = await import('fs/promises');
       const content = await fs.readFile('src/lib/discovery/providers/SearchEngineProvider.ts', 'utf8');
       
-      expect(content).toContain('Return only concrete job posting URLs');
+      expect(content).toContain('Return ONLY a JSONL format');
+      expect(content).toContain('{"url": "exact absolute job posting URL", "title": "job title", "company": "company name", "location": "location if available"}');
       expect(content).toContain('Never replace them with ATS root domains');
-      expect(content).toContain('No Markdown, no bullets');
-      expect(content).toContain('Return one URL per line');
+      expect(content).toContain('Just the JSONL objects');
     });
   });
 
