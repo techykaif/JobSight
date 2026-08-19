@@ -1033,7 +1033,12 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
     const { evaluateCandidateDecision } = await import('../candidate-decision/engine.js');
     const b7Results = await db.select().from(schema.decisionResults).where(eq(schema.decisionResults.runId, runId));
     const fitResults = await db.select().from(schema.candidateFitResults).where(eq(schema.candidateFitResults.runId, runId));
-    const hasSnapshot = !!run.profileSnapshot;
+    const currentRun = await db.select({ profileSnapshot: schema.runs.profileSnapshot })
+      .from(schema.runs)
+      .where(eq(schema.runs.id, runId))
+      .limit(1)
+      .get();
+    const hasSnapshot = !!currentRun?.profileSnapshot;
 
     for (const job of validJobsMap.values()) {
       const b7Dec = b7Results.find(r => r.jobId === job.id);

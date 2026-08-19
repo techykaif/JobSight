@@ -170,7 +170,7 @@ export default async function DecisionBoardPage() {
   const totalActive = (buckets['Apply Now']?.length ?? 0) + (buckets['Apply This Week']?.length ?? 0) + (buckets['Monitor']?.length ?? 0);
 
   return (
-    <div style={{
+    <div className="decision-board" style={{
       display: 'flex',
       flexDirection: 'column',
       height: '100vh',
@@ -179,7 +179,7 @@ export default async function DecisionBoardPage() {
       padding: '28px 32px',
     }}>
       {/* Header */}
-      <div style={{ marginBottom: 24, flexShrink: 0 }}>
+      <div className="decision-board-header" style={{ marginBottom: 24, flexShrink: 0 }}>
         <Breadcrumbs items={[{ label: 'Home', href: '/' }, { label: 'Decision Board' }]} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 16, gap: 16 }}>
           <div>
@@ -200,7 +200,7 @@ export default async function DecisionBoardPage() {
       </div>
 
       {/* Board columns */}
-      <div style={{
+      <div className="decision-board-columns" style={{
         display: 'flex',
         gap: 14,
         overflowX: 'auto',
@@ -216,6 +216,7 @@ export default async function DecisionBoardPage() {
               key={col.key}
               role="region"
               aria-label={`${col.key} column`}
+              className="decision-board-column"
               style={{
                 minWidth: 300,
                 width: 300,
@@ -230,7 +231,7 @@ export default async function DecisionBoardPage() {
               }}
             >
               {/* Column header */}
-              <div style={{
+              <div className="decision-board-column-header" style={{
                 padding: '14px 16px',
                 borderBottom: '1px solid var(--border-hairline)',
                 display: 'flex',
@@ -269,7 +270,7 @@ export default async function DecisionBoardPage() {
               </div>
 
               {/* Jobs list */}
-              <div style={{
+              <div className="decision-board-column-list" style={{
                 flex: 1,
                 overflowY: 'auto',
                 padding: '10px',
@@ -279,7 +280,7 @@ export default async function DecisionBoardPage() {
                 scrollbarWidth: 'thin',
               }}>
                 {jobs.length === 0 ? (
-                  <div style={{
+                  <div className="decision-board-empty" style={{
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',

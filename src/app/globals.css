@@ -996,7 +996,69 @@ tr:hover td { background-color: var(--bg-hover); }
 }
 
 /* ============================================================
-   18. GLOBAL SEARCH MODAL
+   18. DECISION BOARD LAYOUT
+   ============================================================ */
+
+.decision-board-columns {
+  width: 100%;
+  min-width: 0;
+  flex-shrink: 1;
+  align-items: flex-start !important;
+  overscroll-behavior-x: contain;
+}
+
+.decision-board-column {
+  width: clamp(320px, 30vw, 380px) !important;
+  min-width: clamp(320px, 30vw, 380px) !important;
+  max-height: calc(100vh - 170px) !important;
+}
+
+.decision-board-column-list {
+  flex: 0 1 auto !important;
+  min-height: 0;
+  max-height: calc(100vh - 245px);
+}
+
+.decision-board-empty {
+  flex: 0 0 auto !important;
+  min-height: 84px;
+  padding: 22px 16px !important;
+}
+
+.decision-board .board-card {
+  height: auto !important;
+  min-height: 0;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 700px) {
+  .decision-board {
+    height: auto !important;
+    min-height: calc(100vh - 56px);
+    overflow: visible !important;
+  }
+
+  .decision-board-columns {
+    min-width: 0;
+    flex-direction: column;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+  }
+
+  .decision-board-column {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-height: none !important;
+  }
+
+  .decision-board-column-list {
+    max-height: none;
+    overflow-y: visible !important;
+  }
+}
+
+/* ============================================================
+   19. GLOBAL SEARCH MODAL
    ============================================================ */
 
 .global-search-overlay {
