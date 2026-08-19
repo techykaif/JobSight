@@ -16,10 +16,10 @@ describe('Targeted Discovery Fixes', () => {
       const fs = await import('fs/promises');
       const content = await fs.readFile('src/lib/discovery/providers/SearchEngineProvider.ts', 'utf8');
       
-      expect(content).toContain('CRITICAL URL REQUIREMENTS:');
-      expect(content).toContain('EXACT, full absolute URL');
-      expect(content).toContain('Do NOT provide a generic ATS root domain');
-      expect(content).toContain('One exact URL per discovered posting');
+      expect(content).toContain('Return only concrete job posting URLs');
+      expect(content).toContain('Never replace them with ATS root domains');
+      expect(content).toContain('No Markdown, no bullets');
+      expect(content).toContain('Return one URL per line');
     });
   });
 
