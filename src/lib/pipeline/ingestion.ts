@@ -245,6 +245,8 @@ ${chunk}
             const stageAJob = discoveredJobs.find(dj => dj.sourceUrl === candidate.job.url);
             if (stageAJob && stageAJob.sourceUrl) {
                 candidate.sources = [{ url: stageAJob.sourceUrl, type: (stageAJob as any).sourceProvider || 'OTHER' }];
+            } else {
+                candidate.sources = [{ url: candidate.job.url, type: 'SEARCH_RESULT' }];
             }
          }
       }
