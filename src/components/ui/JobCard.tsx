@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card } from './Card';
@@ -104,7 +104,6 @@ export const JobCard: React.FC<JobCardProps> = ({
   onClick,
   className = '',
 }) => {
-  const [isHovered, setIsHovered] = useState(false);
   const router = useRouter();
 
   const handleCardClick = () => {
@@ -119,8 +118,6 @@ export const JobCard: React.FC<JobCardProps> = ({
       className={`profile-card ${className}`}
       interactive
       onClick={handleCardClick}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
       style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 'var(--space-4)' }}
       aria-label={`${title} at ${company}`}
     >
@@ -251,7 +248,7 @@ export const JobCard: React.FC<JobCardProps> = ({
       )}
 
       {/* 7 & 8. Footer row: Metadata & Actions */}
-      <div style={{
+      <div className="job-card-footer" style={{
         marginTop: 'auto',
         paddingTop: 'var(--space-3)',
         borderTop: '1px solid var(--border-subtle)',
@@ -259,8 +256,6 @@ export const JobCard: React.FC<JobCardProps> = ({
         justifyContent: 'space-between',
         alignItems: 'center',
         gap: 'var(--space-2)',
-        opacity: isHovered ? 1 : 0.7,
-        transition: 'var(--transition-fast)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
           {age && (
