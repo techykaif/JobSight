@@ -1,4 +1,5 @@
 import './globals.css';
+import './ui-polish.css';
 import GlobalSearch from '@/components/GlobalSearch';
 import Sidebar from '@/components/Sidebar';
 
