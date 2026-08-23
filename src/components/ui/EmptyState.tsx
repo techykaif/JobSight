@@ -17,7 +17,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   className = '',
 }) => {
   return (
-    <Card className={className} padding="large">
+    <Card className={`ui-empty-state ${className}`} padding="large">
       <div style={{
         display: 'flex',
         flexDirection: 'column',
