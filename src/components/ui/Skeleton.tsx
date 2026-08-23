@@ -29,7 +29,7 @@ export const Skeleton: React.FC<SkeletonProps> = ({
     width: width || (variant === 'text' ? '100%' : '100px'),
     height: height || (variant === 'text' ? '1rem' : '100px'),
     borderRadius: getBorderRadius(),
-    background: 'linear-gradient(90deg, var(--border-subtle) 25%, #f3f4f6 50%, var(--border-subtle) 75%)',
+    background: 'linear-gradient(90deg, var(--border-subtle) 25%, var(--bg-hover) 50%, var(--border-subtle) 75%)',
     backgroundSize: '200% 100%',
     animation: 'skeleton-loading 1.5s infinite',
   };
