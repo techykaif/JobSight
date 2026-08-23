@@ -25,6 +25,7 @@ export interface JobCardProps {
   companyOpportunity?: string | undefined;
   confidence?: number | undefined;
   eligibility?: string | undefined;
+  hideDecisionBadge?: boolean | undefined;
   onClick?: (() => void) | undefined;
   className?: string | undefined;
 }
@@ -95,23 +96,12 @@ const ScoreGauge: React.FC<{ score: number }> = ({ score }) => {
   const tone = clamped >= 75 ? 'var(--success)' : clamped >= 50 ? 'var(--warning)' : 'var(--danger)';
 
   return (
-    <span
-      title={`Score: ${clamped}`}
-      aria-label={`Score: ${clamped}`}
-      style={{ position: 'relative', display: 'inline-flex', width: 40, height: 40, flexShrink: 0 }}
-    >
+    <span title={`Score: ${clamped}`} aria-label={`Score: ${clamped}`} style={{ position: 'relative', display: 'inline-flex', width: 40, height: 40, flexShrink: 0 }}>
       <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true" style={{ transform: 'rotate(-90deg)' }}>
         <circle cx="20" cy="20" r={radius} fill="none" stroke="var(--border-default)" strokeWidth="3" />
-        <circle
-          cx="20" cy="20" r={radius} fill="none" stroke={tone} strokeWidth="3" strokeLinecap="round"
-          strokeDasharray={`${dash} ${circumference - dash}`} style={{ transition: 'stroke-dasharray 0.3s ease' }}
-        />
+        <circle cx="20" cy="20" r={radius} fill="none" stroke={tone} strokeWidth="3" strokeLinecap="round" strokeDasharray={`${dash} ${circumference - dash}`} />
       </svg>
-      <span style={{
-        position: 'absolute', inset: 0, display: 'grid', placeItems: 'center',
-        fontFamily: 'var(--font-mono)', fontSize: '0.6875rem', fontWeight: 600,
-        fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)',
-      }}>
+      <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', fontFamily: 'var(--font-mono)', fontSize: '0.6875rem', fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>
         {Math.round(clamped)}
       </span>
     </span>
@@ -119,199 +109,59 @@ const ScoreGauge: React.FC<{ score: number }> = ({ score }) => {
 };
 
 export const JobCard: React.FC<JobCardProps> = ({
-  id,
-  title,
-  company,
-  salaryMin,
-  salaryMax,
-  remote,
-  score,
-  competition,
-  provider,
-  age,
-  decision,
-  primaryReason,
-  readiness,
-  companyOpportunity,
-  confidence,
-  eligibility,
-  onClick,
-  className = '',
+  id, title, company, salaryMin, salaryMax, remote, score, competition, provider, age, decision, primaryReason,
+  readiness, companyOpportunity, confidence, eligibility, hideDecisionBadge = false, onClick, className = '',
 }) => {
   const router = useRouter();
-
-  const handleCardClick = () => {
-    if (onClick) onClick();
-    router.push(`/jobs/${id}`);
-  };
-
+  const handleCardClick = () => { if (onClick) onClick(); router.push(`/jobs/${id}`); };
   const stop = (e: React.MouseEvent) => e.stopPropagation();
   const initials = companyInitials(company);
   const hue = companyHue(company);
-
-  const secondaryBadgeStyle: React.CSSProperties = {
-    fontSize: '0.6875rem',
-    opacity: 0.82,
-    transform: 'scale(0.94)',
-    transformOrigin: 'left center',
-  };
+  const secondaryBadgeStyle: React.CSSProperties = { fontSize: '0.6875rem', opacity: 0.82, transform: 'scale(0.94)', transformOrigin: 'left center' };
 
   return (
-    <Card
-      className={`profile-card ${className}`}
-      interactive
-      onClick={handleCardClick}
-      style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 'var(--space-4)' }}
-      aria-label={`${title} at ${company}`}
-    >
-      {/* Company + measured score */}
+    <Card className={`profile-card ${className}`} interactive onClick={handleCardClick} style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 'var(--space-4)' }} aria-label={`${title} at ${company}`}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-3)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
-          <span
-            aria-hidden="true"
-            style={{
-              width: 30, height: 30, borderRadius: 'var(--radius-md)', flexShrink: 0,
-              display: 'grid', placeItems: 'center',
-              background: `hsla(${hue}, 55%, 55%, 0.11)`,
-              border: `1px solid hsla(${hue}, 55%, 65%, 0.22)`,
-              color: `hsl(${hue}, 70%, 72%)`,
-              fontFamily: 'var(--font-mono)', fontSize: '0.625rem', fontWeight: 600,
-              letterSpacing: '-0.02em',
-            }}
-          >
+          <span aria-hidden="true" style={{ width: 30, height: 30, borderRadius: 'var(--radius-md)', flexShrink: 0, display: 'grid', placeItems: 'center', background: `hsla(${hue}, 55%, 55%, 0.11)`, border: `1px solid hsla(${hue}, 55%, 65%, 0.22)`, color: `hsl(${hue}, 70%, 72%)`, fontFamily: 'var(--font-mono)', fontSize: '0.625rem', fontWeight: 600 }}>
             {initials}
           </span>
-          <span style={{
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)',
-            letterSpacing: '0.055em', textTransform: 'uppercase',
-          }}>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.055em', textTransform: 'uppercase' }}>
             {company}
           </span>
         </div>
-        {score !== undefined && (
-          <div onClick={stop} style={{ flexShrink: 0 }}>
-            <Link href={`/jobs?minScore=${score}`} style={{ textDecoration: 'none', display: 'inline-flex' }}>
-              <ScoreGauge score={score} />
-            </Link>
-          </div>
-        )}
+        {score !== undefined && <div onClick={stop} style={{ flexShrink: 0 }}><Link href={`/jobs?minScore=${score}`} style={{ textDecoration: 'none', display: 'inline-flex' }}><ScoreGauge score={score} /></Link></div>}
       </div>
 
-      {/* Job title */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <h3 style={{
-          margin: 0, fontSize: '1.0625rem', fontWeight: 600, color: 'var(--text-primary)',
-          letterSpacing: '-0.015em', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box',
-          WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', lineHeight: 1.4,
-        }}>
+        <h3 style={{ margin: 0, fontSize: '1.0625rem', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.015em', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', lineHeight: 1.4 }}>
           {title}
         </h3>
       </div>
 
-      {/* Decision is primary; supporting facts are visually quieter. */}
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px' }}>
-        {decision && decision !== 'PENDING' && (
+        {decision && decision !== 'PENDING' && !hideDecisionBadge && (
           <div onClick={stop}>
             <Link href={`/jobs?decision=${encodeURIComponent(decision)}`} style={{ textDecoration: 'none' }}>
               <StatusBadge status={decisionLabel(decision)} variant={decisionVariant(decision)} />
             </Link>
           </div>
         )}
-
-        {salaryMin !== undefined && salaryMax !== undefined && (
-          <div onClick={stop} style={secondaryBadgeStyle}>
-            <Link href={`/jobs?salaryMin=${salaryMin}&salaryMax=${salaryMax}`} style={{ textDecoration: 'none' }}>
-              <SalaryBadge min={salaryMin} max={salaryMax} />
-            </Link>
-          </div>
-        )}
-
-        {remote && (
-          <div onClick={stop} style={secondaryBadgeStyle}>
-            <Link href="/jobs?remote=REMOTE" style={{ textDecoration: 'none' }}>
-              <StatusBadge
-                status={
-                  eligibility === 'ELIGIBLE' ? 'Remote (Eligible)' :
-                  eligibility === 'NOT_ELIGIBLE' ? 'Not Eligible' :
-                  eligibility === 'UNKNOWN' ? 'Remote (Unknown)' : 'Remote'
-                }
-                variant={
-                  eligibility === 'ELIGIBLE' ? 'success' :
-                  eligibility === 'NOT_ELIGIBLE' ? 'danger' :
-                  eligibility === 'UNKNOWN' ? 'warning' : 'info'
-                }
-              />
-            </Link>
-          </div>
-        )}
-
-        {competition && (
-          <div onClick={stop} style={secondaryBadgeStyle}>
-            <Link href={`/jobs?competition=${encodeURIComponent(competition)}`} style={{ textDecoration: 'none' }}>
-              <StatusBadge status={`${competition} Comp`} variant={competitionVariant(competition)} />
-            </Link>
-          </div>
-        )}
-
-        {readiness && (
-          <div onClick={stop} style={secondaryBadgeStyle}>
-            <Link href={`/jobs/${id}`} style={{ textDecoration: 'none' }}>
-              <StatusBadge status={readiness} variant={readinessVariant(readiness)} aria-label={`Readiness: ${readiness}`} />
-            </Link>
-          </div>
-        )}
-
-        {companyOpportunity && (
-          <div onClick={stop} style={secondaryBadgeStyle}>
-            <Link href={`/jobs/${id}`} style={{ textDecoration: 'none' }}>
-              <StatusBadge status={companyOpportunity} variant={companyOpportunityVariant(companyOpportunity)} aria-label={`Company opportunity: ${companyOpportunity}`} />
-            </Link>
-          </div>
-        )}
+        {salaryMin !== undefined && salaryMax !== undefined && <div onClick={stop} style={secondaryBadgeStyle}><Link href={`/jobs?salaryMin=${salaryMin}&salaryMax=${salaryMax}`} style={{ textDecoration: 'none' }}><SalaryBadge min={salaryMin} max={salaryMax} /></Link></div>}
+        {remote && <div onClick={stop} style={secondaryBadgeStyle}><Link href="/jobs?remote=REMOTE" style={{ textDecoration: 'none' }}><StatusBadge status={eligibility === 'ELIGIBLE' ? 'Remote (Eligible)' : eligibility === 'NOT_ELIGIBLE' ? 'Not Eligible' : eligibility === 'UNKNOWN' ? 'Remote (Unknown)' : 'Remote'} variant={eligibility === 'ELIGIBLE' ? 'success' : eligibility === 'NOT_ELIGIBLE' ? 'danger' : eligibility === 'UNKNOWN' ? 'warning' : 'info'} /></Link></div>}
+        {competition && <div onClick={stop} style={secondaryBadgeStyle}><Link href={`/jobs?competition=${encodeURIComponent(competition)}`} style={{ textDecoration: 'none' }}><StatusBadge status={`${competition} Comp`} variant={competitionVariant(competition)} /></Link></div>}
+        {readiness && <div onClick={stop} style={secondaryBadgeStyle}><Link href={`/jobs/${id}`} style={{ textDecoration: 'none' }}><StatusBadge status={readiness} variant={readinessVariant(readiness)} aria-label={`Readiness: ${readiness}`} /></Link></div>}
+        {companyOpportunity && <div onClick={stop} style={secondaryBadgeStyle}><Link href={`/jobs/${id}`} style={{ textDecoration: 'none' }}><StatusBadge status={companyOpportunity} variant={companyOpportunityVariant(companyOpportunity)} aria-label={`Company opportunity: ${companyOpportunity}`} /></Link></div>}
       </div>
 
-      {primaryReason && (
-        <div style={{
-          fontSize: '0.75rem', color: 'var(--text-secondary)', background: 'var(--bg-subtle)',
-          padding: 'var(--space-3)', borderRadius: 'var(--radius-sm)', borderLeft: '2px solid var(--accent)', lineHeight: 1.5,
-        }}>
-          <strong>Reason:</strong> {primaryReason}
-        </div>
-      )}
+      {primaryReason && <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', background: 'var(--bg-subtle)', padding: 'var(--space-3)', borderRadius: 'var(--radius-sm)', borderLeft: '2px solid var(--accent)', lineHeight: 1.5 }}><strong>Reason:</strong> {primaryReason}</div>}
 
-      <div className="job-card-footer" style={{
-        marginTop: 'auto', paddingTop: 'var(--space-3)', borderTop: '1px solid var(--border-subtle)',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-2)',
-      }}>
+      <div className="job-card-footer" style={{ marginTop: 'auto', paddingTop: 'var(--space-3)', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-2)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-          {age && (
-            <span style={{
-              fontSize: '0.6875rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4,
-              fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums',
-            }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-              </svg>
-              {age}
-            </span>
-          )}
-          {confidence != null && confidence > 0 && (
-            <span style={{
-              fontSize: '0.625rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)',
-              fontVariantNumeric: 'tabular-nums', fontWeight: 500,
-            }} aria-label={`Confidence: ${confidence}%`}>
-              {confidence}% conf
-            </span>
-          )}
+          {age && <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>{age}</span>}
+          {confidence != null && confidence > 0 && <span style={{ fontSize: '0.625rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontWeight: 500 }} aria-label={`Confidence: ${confidence}%`}>{confidence}% conf</span>}
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <div onClick={stop}>
-            <Link href={`/jobs/${id}`} style={{ textDecoration: 'none' }}>
-              <ActionButton size="small" variant="secondary">View Details</ActionButton>
-            </Link>
-          </div>
-        </div>
+        <div style={{ display: 'flex', gap: 6 }}><div onClick={stop}><Link href={`/jobs/${id}`} style={{ textDecoration: 'none' }}><ActionButton size="small" variant="secondary">View Details</ActionButton></Link></div></div>
       </div>
     </Card>
   );
