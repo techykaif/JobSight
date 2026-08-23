@@ -13,7 +13,7 @@ describe('D1.7.4 Candidate Fit Intelligence', () => {
   beforeEach(async () => {
     migrate(db, { migrationsFolder: './src/lib/db/migrations' });
     runId = crypto.randomUUID();
-    
+
     // Create Profile
     await db.insert(schema.profiles).values({
       id: 'fit-prof-1',
@@ -39,7 +39,7 @@ describe('D1.7.4 Candidate Fit Intelligence', () => {
 
     // Create Run with Profile Snapshot
     const profile = await db.select().from(schema.profiles).where(eq(schema.profiles.id, 'fit-prof-1')).get();
-    
+
     await db.insert(schema.runs).values({
       id: runId,
       configId: 'fit-config-1',
@@ -130,34 +130,160 @@ describe('D1.7.4 Candidate Fit Intelligence', () => {
     expect(result!.level).toBe('partial');
   });
 
-  it('8. Missing job requirements', async () => {
+  it('8. Missing job requirements (TEST 4 — Role-only Candidate Fit)', async () => {
     await insertTestJob('job-4');
     const job = getBaseJob({
-      job: { title: 'Developer', url: 'http://test.com', status: 'ACTIVE' }
+      job: { title: 'Developer', url: 'http://test.com', status: 'ACTIVE' },
+      description: { requiredSkills: [], preferredSkills: [] }
     });
 
     const result = await evaluateCandidateFit(runId, 'job-4', job);
     expect(result!.dimensions.experience).toBeNull();
     expect(result!.dimensions.skills).toBeNull();
-    // Role matching 'Developer' against 'Full Stack Developer' is partial or strong depending on includes logic
-    expect(result!.dimensions.role).toBe(100); // job title 'developer' is inside 'full stack developer'
-    expect(result!.score).toBe(100);
+    expect(result!.dimensions.role).toBe(100);
+    // activeDimensions = 1
+    expect(result!.level).toBe('insufficient_evidence');
   });
 
-  it('10. Insufficient evidence', async () => {
+  it('10. Insufficient evidence (TEST 10 — No meaningful dimensions)', async () => {
     await insertTestJob('job-5');
     const job = getBaseJob({
       job: { title: 'Manager', url: 'http://test.com', status: 'ACTIVE' }
     });
 
     const result = await evaluateCandidateFit(runId, 'job-5', job);
-    // Title doesn't match, no experience, no skills
     expect(result!.dimensions.role).toBe(0);
     expect(result!.dimensions.experience).toBeNull();
     expect(result!.dimensions.skills).toBeNull();
-    expect(result!.score).toBe(0);
-    expect(result!.level).toBe('weak');
+    expect(result!.level).toBe('insufficient_evidence');
   });
+
+  it('TEST 5 — Skills-only Candidate Fit', async () => {
+    await insertTestJob('job-t5');
+    // Create a run with a profile that lacks target roles and experience
+    const noExpRoleRunId = crypto.randomUUID();
+    await db.insert(schema.runs).values({
+      id: noExpRoleRunId,
+      configId: 'fit-config-1',
+      status: 'RUNNING',
+      currentStage: 'INGESTION',
+      profileSnapshot: {
+        profileId: 'temp', profileName: 'temp', snapshotAt: new Date().toISOString(),
+        profile: { skills: ['typescript'] } // ONLY skills
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+
+    const job = getBaseJob({
+      job: { title: 'Engineer', url: 'http://test.com', status: 'ACTIVE' },
+      description: { requiredSkills: ['typescript'] }
+    });
+
+    const result = await evaluateCandidateFit(noExpRoleRunId, 'job-t5', job);
+    expect(result!.dimensions.skills).toBe(100);
+    expect(result!.dimensions.experience).toBeNull();
+    expect(result!.dimensions.role).toBeNull();
+    // activeDimensions = 1
+    expect(result!.level).toBe('insufficient_evidence');
+
+    await db.delete(schema.candidateFitResults).where(eq(schema.candidateFitResults.runId, noExpRoleRunId));
+    await db.delete(schema.runs).where(eq(schema.runs.id, noExpRoleRunId));
+  });
+
+  it('TEST 6 — Experience-only Candidate Fit', async () => {
+    await insertTestJob('job-t6');
+    // Profile with ONLY experience
+    const noRoleSkillRunId = crypto.randomUUID();
+    await db.insert(schema.runs).values({
+      id: noRoleSkillRunId,
+      configId: 'fit-config-1',
+      status: 'RUNNING',
+      currentStage: 'INGESTION',
+      profileSnapshot: {
+        profileId: 'temp', profileName: 'temp', snapshotAt: new Date().toISOString(),
+        profile: { yearsOfProfessionalExperience: 5 }
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+
+    const job = getBaseJob({
+      job: { title: 'Engineer', url: 'http://test.com', status: 'ACTIVE' },
+      experience: { minYears: 3 }
+    });
+
+    const result = await evaluateCandidateFit(noRoleSkillRunId, 'job-t6', job);
+    expect(result!.dimensions.experience).toBe(100);
+    expect(result!.dimensions.skills).toBeNull();
+    expect(result!.dimensions.role).toBeNull();
+    // activeDimensions = 1
+    expect(result!.level).toBe('insufficient_evidence');
+
+    await db.delete(schema.candidateFitResults).where(eq(schema.candidateFitResults.runId, noRoleSkillRunId));
+    await db.delete(schema.runs).where(eq(schema.runs.id, noRoleSkillRunId));
+  });
+
+  it('TEST 7 — Role + Skills', async () => {
+    await insertTestJob('job-t7');
+    const job = getBaseJob({
+      job: { title: 'Software Engineer', url: 'http://test.com', status: 'ACTIVE' },
+      description: { requiredSkills: ['typescript'] },
+      experience: {} // unknown
+    });
+    const result = await evaluateCandidateFit(runId, 'job-t7', job);
+    expect(result!.dimensions.role).toBe(100);
+    expect(result!.dimensions.skills).toBe(100);
+    expect(result!.dimensions.experience).toBeNull();
+    // activeDimensions = 2 => safe to evaluate
+    expect(['strong', 'good']).toContain(result!.level);
+  });
+
+  it('TEST 8 — Role + Experience', async () => {
+    await insertTestJob('job-t8');
+    const job = getBaseJob({
+      job: { title: 'Software Engineer', url: 'http://test.com', status: 'ACTIVE' },
+      description: {}, // unknown skills
+      experience: { minYears: 3 }
+    });
+    const result = await evaluateCandidateFit(runId, 'job-t8', job);
+    expect(result!.dimensions.role).toBe(100);
+    expect(result!.dimensions.experience).toBe(100);
+    expect(result!.dimensions.skills).toBeNull();
+    // activeDimensions = 2 => safe to evaluate
+    expect(['strong', 'good']).toContain(result!.level);
+  });
+
+  it('TEST 9 — All three dimensions', async () => {
+    await insertTestJob('job-t9');
+    const job = getBaseJob({
+      job: { title: 'Software Engineer', url: 'http://test.com', status: 'ACTIVE' },
+      description: { requiredSkills: ['typescript'] },
+      experience: { minYears: 3 }
+    });
+    const result = await evaluateCandidateFit(runId, 'job-t9', job);
+    expect(result!.dimensions.role).toBe(100);
+    expect(result!.dimensions.experience).toBe(100);
+    expect(result!.dimensions.skills).toBe(100);
+    // activeDimensions = 3
+    expect(result!.level).toBe('strong');
+  });
+
+  it('TEST 15 — Senior title alone remains allowed', async () => {
+    await insertTestJob('job-t15');
+    const job = getBaseJob({
+      job: { title: 'Senior Software Engineer', url: 'http://test.com', status: 'ACTIVE' },
+      description: { requiredSkills: ['typescript'] }, // skills available => 2 dims
+      experience: {} // no explicit experience
+    });
+    const result = await evaluateCandidateFit(runId, 'job-t15', job);
+    expect(result!.dimensions.role).toBe(100); // Title should still match "Software Engineer" based on substring
+    expect(result!.dimensions.skills).toBe(100);
+    expect(result!.dimensions.experience).toBeNull();
+    // Because it's 2 dimensions, it is evaluated normally, not rejected
+    expect(['strong', 'good']).toContain(result!.level);
+  });
+
 
   it('11. Profile-less Run explicitly unavailable', async () => {
     await insertTestJob('job-6');
@@ -189,7 +315,7 @@ describe('D1.7.4 Candidate Fit Intelligence', () => {
 
     const r1 = await evaluateCandidateFit(runId, 'job-7', job);
     const r2 = await evaluateCandidateFit(runId, 'job-7', job);
-    
+
     expect(r1).toEqual(r2); // Same inputs => exact same outputs
   });
 
@@ -221,7 +347,7 @@ describe('D1.7.4 Candidate Fit Intelligence', () => {
     it('1 & 2 & 3. Repeated execution reuses row idempotently', async () => {
       await insertTestJob('job-idem-1');
       const job = getBaseJob({ job: { title: 'Engineer', url: 'http://test.com', status: 'ACTIVE' }});
-      
+
       // First run
       await evaluateCandidateFit(runId, 'job-idem-1', job);
       let results = await db.select().from(schema.candidateFitResults).where(eq(schema.candidateFitResults.runId, runId)).all();
@@ -238,7 +364,7 @@ describe('D1.7.4 Candidate Fit Intelligence', () => {
     it('4. Same job across different runs produces different rows', async () => {
       await insertTestJob('job-idem-2');
       const job = getBaseJob({ job: { title: 'Engineer', url: 'http://test.com', status: 'ACTIVE' }});
-      
+
       const run2Id = crypto.randomUUID();
       await db.insert(schema.runs).values({
         id: run2Id,
@@ -255,7 +381,7 @@ describe('D1.7.4 Candidate Fit Intelligence', () => {
 
       const run1Results = await db.select().from(schema.candidateFitResults).where(eq(schema.candidateFitResults.runId, runId)).all();
       const run2Results = await db.select().from(schema.candidateFitResults).where(eq(schema.candidateFitResults.runId, run2Id)).all();
-      
+
       expect(run1Results.length).toBe(1);
       expect(run2Results.length).toBe(1);
 

@@ -112,3 +112,101 @@ describe('Candidate Decision Engine (D1.7.5)', () => {
   });
 
 });
+
+describe('Phase 2: Decision Integrity Arbitration Tests', () => {
+  const defaultFit = (level: string): CandidateFitSignal => ({
+    level: level as any,
+    score: 80,
+    dimensions: { experience: 100, role: 100, skills: 80 },
+    matchedSkills: [],
+    missingSkills: [],
+    reasons: []
+  });
+
+  const geoEligible: GeographicEligibilityResult = { eligibilityStatus: 'ELIGIBLE', remoteScope: 'WORLDWIDE', eligibilityConfidence: 'HIGH', eligibilityReason: '' };
+  const geoNeedsVerification: GeographicEligibilityResult = { eligibilityStatus: 'NEEDS_VERIFICATION', remoteScope: 'WORLDWIDE', eligibilityConfidence: 'LOW', eligibilityReason: '' };
+
+  it('TEST 1 — Qualification SKIP survives', () => {
+    // Qualification = SKIP, Fit = STRONG, B6 = ELIGIBLE, B7 = undefined
+    const res = evaluateCandidateDecision(
+      true,
+      defaultFit('strong'),
+      undefined,
+      geoEligible,
+      { decision: 'SKIP', reasons: ['ordinary qualification failure'] }
+    );
+    expect(res.finalDecision).toBe('SKIP');
+  });
+
+  it('TEST 2 — Qualification SKIP with B7 APPLY still loses', () => {
+    // Qualification = SKIP, Fit = STRONG, B6 = ELIGIBLE, B7 = APPLY_NOW
+    const res = evaluateCandidateDecision(
+      true,
+      defaultFit('strong'),
+      'APPLY_NOW',
+      geoEligible,
+      { decision: 'SKIP', reasons: ['ordinary qualification failure'] }
+    );
+    expect(res.finalDecision).toBe('SKIP');
+  });
+
+  it('TEST 3 — Phase 1 EXTREME EXPERIENCE remains INELIGIBLE', () => {
+    // Qualification = SKIP (EXTREME_EXPERIENCE_GAP), Fit = STRONG, B6 = ELIGIBLE
+    const res = evaluateCandidateDecision(
+      true,
+      defaultFit('strong'),
+      undefined,
+      geoEligible,
+      { decision: 'SKIP', reasons: ['EXTREME_EXPERIENCE_GAP'] }
+    );
+    expect(res.finalDecision).toBe('INELIGIBLE');
+  });
+
+  it('TEST 11 — Insufficient Fit cannot APPLY', () => {
+    // Fit: insufficient_evidence, B6: ELIGIBLE, B7: APPLY_NOW, Qualification: CONSIDER
+    const res = evaluateCandidateDecision(
+      true,
+      defaultFit('insufficient_evidence'),
+      'APPLY_NOW',
+      geoEligible,
+      { decision: 'CONSIDER', reasons: [] }
+    );
+    expect(res.finalDecision).toBe('REVIEW');
+  });
+
+  it('TEST 12 — Geographic uncertainty cannot APPLY', () => {
+    // Fit: STRONG, B6: NEEDS_VERIFICATION, B7: APPLY_NOW, Qualification: CONSIDER
+    const res = evaluateCandidateDecision(
+      true,
+      defaultFit('strong'),
+      'APPLY_NOW',
+      geoNeedsVerification,
+      { decision: 'CONSIDER', reasons: [] }
+    );
+    expect(res.finalDecision).toBe('REVIEW');
+  });
+
+  it('TEST 13 — Weak Fit cannot APPLY', () => {
+    // Fit: weak, B6: ELIGIBLE, B7: APPLY_NOW, Qualification: CONSIDER
+    const res = evaluateCandidateDecision(
+      true,
+      defaultFit('weak'),
+      'APPLY_NOW',
+      geoEligible,
+      { decision: 'CONSIDER', reasons: [] }
+    );
+    expect(res.finalDecision).toBe('SKIP');
+  });
+
+  it('TEST 14 — Legitimate APPLY preserved', () => {
+    // Fit: STRONG, B6: ELIGIBLE, B7: APPLY_NOW, Qualification: CONSIDER
+    const res = evaluateCandidateDecision(
+      true,
+      defaultFit('strong'),
+      'APPLY_NOW',
+      geoEligible,
+      { decision: 'CONSIDER', reasons: [] }
+    );
+    expect(res.finalDecision).toBe('APPLY');
+  });
+});

@@ -23,7 +23,7 @@ export async function evaluateCandidateFit(
   jobMetadata: CandidateJob
 ): Promise<CandidateFitSignal | null> {
   const run = await db.select().from(schema.runs).where(eq(schema.runs.id, runId)).limit(1).get();
-  
+
   // Explicitly unavailable if no profile exists
   if (!run || !run.profileSnapshot) {
     return null;
@@ -42,7 +42,7 @@ export async function evaluateCandidateFit(
   // 1. Experience Fit
   const profileExp = profile.yearsOfProfessionalExperience;
   const jobMinExp = jobMetadata.experience?.minYears;
-  
+
   if (typeof profileExp === 'number' && typeof jobMinExp === 'number') {
     if (profileExp >= jobMinExp) {
       dimensions.experience = 100;
@@ -63,10 +63,10 @@ export async function evaluateCandidateFit(
   // 2. Skill Fit
   const matchedSkills: string[] = [];
   const missingSkills: string[] = [];
-  
+
   const profileSkills = Array.isArray(profile.skills) ? profile.skills.map((s: string) => s.toLowerCase().trim()) : [];
-  const requiredSkills = Array.isArray(jobMetadata.description?.requiredSkills) 
-    ? jobMetadata.description!.requiredSkills.map(s => s.toLowerCase().trim()) 
+  const requiredSkills = Array.isArray(jobMetadata.description?.requiredSkills)
+    ? jobMetadata.description!.requiredSkills.map(s => s.toLowerCase().trim())
     : [];
 
   if (requiredSkills.length > 0) {
@@ -77,7 +77,7 @@ export async function evaluateCandidateFit(
         missingSkills.push(skill);
       }
     }
-    
+
     const matchRatio = matchedSkills.length / requiredSkills.length;
     dimensions.skills = Math.round(matchRatio * 100);
     reasons.push(`Candidate matches ${matchedSkills.length}/${requiredSkills.length} required skills.`);
@@ -120,10 +120,16 @@ export async function evaluateCandidateFit(
 
   if (activeDimensions > 0) {
     score = Math.round(totalScore / activeDimensions);
-    if (score >= 80) level = 'strong';
-    else if (score >= 60) level = 'good';
-    else if (score >= 40) level = 'partial';
-    else level = 'weak';
+
+    if (activeDimensions < 2) {
+      level = 'insufficient_evidence';
+      reasons.push(`Insufficient active dimensions (${activeDimensions}/3) to establish a definitive fit.`);
+    } else {
+      if (score >= 80) level = 'strong';
+      else if (score >= 60) level = 'good';
+      else if (score >= 40) level = 'partial';
+      else level = 'weak';
+    }
   } else {
     reasons.push(`Insufficient metadata to calculate a meaningful candidate fit.`);
   }

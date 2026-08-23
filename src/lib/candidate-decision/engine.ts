@@ -41,6 +41,14 @@ export function evaluateCandidateDecision(
     };
   }
 
+  // RULE B3: General Qualification Veto
+  if (qualificationDecision?.decision === 'SKIP') {
+    return {
+      finalDecision: 'SKIP',
+      primaryReason: qualificationDecision.reasons[0] || 'Job did not pass Qualification checks.'
+    };
+  }
+
   // RULE C: Market Opportunity Veto
   if (b7Decision === 'IGNORE') {
     return {
