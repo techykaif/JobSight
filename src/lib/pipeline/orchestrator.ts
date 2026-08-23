@@ -2,7 +2,7 @@ import { evaluateGeographicEligibility } from '../geographic-eligibility/evaluat
 import { enrichJobFromHtml } from './html-enrichment.js';
 import { db } from '../db/client';
 import * as schema from '../db/schema';
-import { eq, isNull, inArray } from 'drizzle-orm';
+import { eq, and, isNull, inArray } from 'drizzle-orm';
 import { emitEvent } from './events';
 import { runIngestionPipeline } from './ingestion';
 import { qualifyJob } from '../qualification/engine';
@@ -156,7 +156,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
 
       const jobsToQualify = [];
       for (const { job } of runJobs) {
-        const existingDec = await db.select().from(schema.decisions).where(eq(schema.decisions.jobId, job.id)).limit(1);
+        const existingDec = await db.select().from(schema.decisions).where(and(eq(schema.decisions.jobId, job.id), eq(schema.decisions.runId, runId))).limit(1);
         const qualifyFailures = runFailures.filter(f => f.stage === 'QUALIFY' && f.entityId === job.id);
         const exhausted = qualifyFailures.length >= 2; // max 2 cross-run retries
 
@@ -344,7 +344,9 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
             qResult = await qualifyJob(job, config, validProfile, abortSignal);
           }
 
-          await db.insert(schema.decisions).values({
+          db.transaction((tx) => {
+            tx.delete(schema.decisions).where(and(eq(schema.decisions.runId, runId), eq(schema.decisions.jobId, job.id))).run();
+            tx.insert(schema.decisions).values({
             id: crypto.randomUUID(),
             runId,
             jobId: job.id,
@@ -352,6 +354,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
             reasons: qResult.reasons,
             unknowns: qResult.unknowns,
             createdAt: new Date().toISOString()
+          }).run();
           });
 
           const scoreTypes = [
@@ -410,6 +413,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
           if (newAttemptCount >= 2) {
             await emitEvent({ runId, type: 'RETRY_EXHAUSTED', stage: 'QUALIFY', entityType: 'JOB', entityId: job.id, message: `Retry exhausted for qualification: ${job.canonicalTitle} - ${err.message}` });
 
+            await db.delete(schema.decisions).where(and(eq(schema.decisions.runId, runId), eq(schema.decisions.jobId, job.id)));
             await db.insert(schema.decisions).values({
               id: crypto.randomUUID(),
               runId,
@@ -440,7 +444,10 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
     // COMPANY RESEARCH
     if (!skipCompanyResearch) {
       const activeDecisions = await db.select().from(schema.decisions)
-        .where(inArray(schema.decisions.decision, ['APPLY', 'CONSIDER', 'RESEARCH_REQUIRED']));
+        .where(and(
+          eq(schema.decisions.runId, runId),
+          inArray(schema.decisions.decision, ['APPLY', 'CONSIDER', 'RESEARCH_REQUIRED'])
+        ));
 
       const runJobs = await db.select({ job: schema.jobs }).from(schema.jobObservations)
         .innerJoin(schema.jobs, eq(schema.jobObservations.jobId, schema.jobs.id))

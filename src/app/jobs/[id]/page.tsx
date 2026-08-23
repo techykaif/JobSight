@@ -1,5 +1,7 @@
 import { db } from '@/lib/db/client';
 import * as schema from '@/lib/db/schema';
+import { getActiveRun } from '@/lib/pipeline/active-run';
+import { and } from 'drizzle-orm';
 import { eq } from 'drizzle-orm';
 import Link from 'next/link';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
@@ -112,6 +114,13 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     );
   }
 
+
+  const latestRun = await getActiveRun();
+  if (!latestRun) {
+    return <div style={{ padding: '2rem' }}><EmptyState title="No active runs" description="Start a hunt to view job details." icon="📋" /></div>;
+  }
+  const runId = latestRun.id;
+
   // ── Company ─────────────────────────────────────────────────────────────────
   const companyRec = job.companyId
     ? await db.select().from(schema.companies).where(eq(schema.companies.id, job.companyId)).limit(1)
@@ -119,17 +128,17 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   const companyName = companyRec[0]?.displayName || 'Unknown Company';
 
   // ── Decisions ───────────────────────────────────────────────────────────────
-  const decisionRec = await db.select().from(schema.decisions).where(eq(schema.decisions.jobId, job.id)).limit(1);
+  const decisionRec = await db.select().from(schema.decisions).where(and(eq(schema.decisions.jobId, job.id), eq(schema.decisions.runId, runId))).limit(1);
   const decision = decisionRec[0];
 
-  const decisionResultRec = await db.select().from(schema.decisionResults).where(eq(schema.decisionResults.jobId, job.id)).limit(1);
+  const decisionResultRec = await db.select().from(schema.decisionResults).where(and(eq(schema.decisionResults.jobId, job.id), eq(schema.decisionResults.runId, runId))).limit(1);
   const decisionResult = decisionResultRec[0];
 
-  const candidateDecisionRec = await db.select().from(schema.candidateDecisions).where(eq(schema.candidateDecisions.jobId, job.id)).limit(1);
+  const candidateDecisionRec = await db.select().from(schema.candidateDecisions).where(and(eq(schema.candidateDecisions.jobId, job.id), eq(schema.candidateDecisions.runId, runId))).limit(1);
   const candidateDecision = candidateDecisionRec[0];
 
   // ── Job analysis ─────────────────────────────────────────────────────────────
-  const analysisRec = await db.select().from(schema.jobAnalysis).where(eq(schema.jobAnalysis.jobId, job.id)).limit(1);
+  const analysisRec = await db.select().from(schema.jobAnalysis).where(and(eq(schema.jobAnalysis.jobId, job.id), eq(schema.jobAnalysis.runId, runId))).limit(1);
   const jobAnalysis = analysisRec[0];
 
   // ── Company analysis (basic) ────────────────────────────────────────────────
@@ -139,7 +148,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   const compAnalysis = compAnalysisRec[0];
 
   // ── Discovery intelligence (basic) ──────────────────────────────────────────
-  const discIntelRec = await db.select().from(schema.discoveryIntelligence).where(eq(schema.discoveryIntelligence.jobId, job.id)).limit(1);
+  const discIntelRec = await db.select().from(schema.discoveryIntelligence).where(and(eq(schema.discoveryIntelligence.jobId, job.id), eq(schema.discoveryIntelligence.runId, runId))).limit(1);
   const discoveryIntel = discIntelRec[0];
 
   // ── Evidence & scores ────────────────────────────────────────────────────────

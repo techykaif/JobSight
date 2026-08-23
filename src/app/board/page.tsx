@@ -1,6 +1,7 @@
 import { db } from '@/lib/db/client';
 import * as schema from '@/lib/db/schema';
-import { eq, desc, inArray } from 'drizzle-orm';
+import { getActiveRun } from '@/lib/pipeline/active-run';
+import { eq, desc, inArray, and } from 'drizzle-orm';
 import Link from 'next/link';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { JobCard } from '@/components/ui/JobCard';
@@ -26,14 +27,37 @@ const COLUMNS = [
 ];
 
 export default async function DecisionBoardPage() {
+  const latestRun = await getActiveRun();
+
+  if (!latestRun) {
+    return <div style={{ padding: '2rem' }}><EmptyState title="No active runs" description="Start a hunt to see your board." icon="📋" /></div>;
+  }
+
   const jobsData = await db
-    .select({ id: schema.jobs.id, title: schema.jobs.canonicalTitle, companyId: schema.jobs.companyId, company: schema.companies.displayName, salaryMin: schema.jobs.salaryMin, salaryMax: schema.jobs.salaryMax, salaryCurrency: schema.jobs.salaryCurrency, remoteType: schema.jobs.remoteType, firstSeenAt: schema.jobs.firstSeenAt, decision: schema.decisions.decision, finalDecision: schema.candidateDecisions.finalDecision, opportunityScore: schema.opportunityIntelligence.opportunityScore, competition: schema.discoveryIntelligence.competition, sourceType: schema.jobSources.sourceType })
-    .from(schema.jobs)
+    .select({
+      id: schema.jobs.id,
+      title: schema.jobs.canonicalTitle,
+      companyId: schema.jobs.companyId,
+      company: schema.companies.displayName,
+      salaryMin: schema.jobs.salaryMin,
+      salaryMax: schema.jobs.salaryMax,
+      salaryCurrency: schema.jobs.salaryCurrency,
+      remoteType: schema.jobs.remoteType,
+      firstSeenAt: schema.jobs.firstSeenAt,
+      decision: schema.decisions.decision,
+      finalDecision: schema.candidateDecisions.finalDecision,
+      opportunityScore: schema.opportunityIntelligence.opportunityScore,
+      competition: schema.discoveryIntelligence.competition,
+      sourceType: schema.jobSources.sourceType
+    })
+    .from(schema.jobObservations)
+    .innerJoin(schema.jobs, eq(schema.jobObservations.jobId, schema.jobs.id))
+    .where(eq(schema.jobObservations.runId, latestRun.id))
     .leftJoin(schema.companies, eq(schema.jobs.companyId, schema.companies.id))
-    .leftJoin(schema.decisions, eq(schema.jobs.id, schema.decisions.jobId))
-    .leftJoin(schema.candidateDecisions, eq(schema.jobs.id, schema.candidateDecisions.jobId))
-    .leftJoin(schema.opportunityIntelligence, eq(schema.jobs.id, schema.opportunityIntelligence.jobId))
-    .leftJoin(schema.discoveryIntelligence, eq(schema.jobs.id, schema.discoveryIntelligence.jobId))
+    .leftJoin(schema.decisions, and(eq(schema.jobs.id, schema.decisions.jobId), eq(schema.decisions.runId, latestRun.id)))
+    .leftJoin(schema.candidateDecisions, and(eq(schema.jobs.id, schema.candidateDecisions.jobId), eq(schema.candidateDecisions.runId, latestRun.id)))
+    .leftJoin(schema.opportunityIntelligence, and(eq(schema.jobs.id, schema.opportunityIntelligence.jobId), eq(schema.opportunityIntelligence.runId, latestRun.id)))
+    .leftJoin(schema.discoveryIntelligence, and(eq(schema.jobs.id, schema.discoveryIntelligence.jobId), eq(schema.discoveryIntelligence.runId, latestRun.id)))
     .leftJoin(schema.jobSources, eq(schema.jobs.id, schema.jobSources.jobId))
     .orderBy(desc(schema.jobs.firstSeenAt));
 
