@@ -1,3 +1,5 @@
+import { evaluateGeographicEligibility } from '../geographic-eligibility/evaluator.js';
+import { enrichJobFromHtml } from './html-enrichment.js';
 import { db } from '../db/client';
 import * as schema from '../db/schema';
 import { eq, isNull, inArray } from 'drizzle-orm';
@@ -229,6 +231,80 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
           const hasArtifact = !!artifact && !!artifact.rawContent && artifact.rawContent.trim().length > 0;
           const hasSuccessfulFetch = source && source.httpStatus !== null && source.httpStatus >= 200 && source.httpStatus < 300;
           const hasEvidence = hasArtifact || hasSuccessfulFetch;
+
+
+          // ★ HTML ENRICHMENT ★
+          if (hasArtifact) {
+            try {
+              const enriched = await enrichJobFromHtml(artifact!.rawContent as string, abortSignal);
+              if (enriched) {
+                // Safely update job fields without overwriting known values with empty ones
+                // REQUIRED DATA-LINEAGE INVARIANT: Original fields are immutable and must NEVER be overwritten.
+                if (enriched.salaryMin !== null && enriched.salaryMin !== undefined) { job.salaryMin = enriched.salaryMin; }
+                if (enriched.salaryMax !== null && enriched.salaryMax !== undefined) { job.salaryMax = enriched.salaryMax; }
+                if (enriched.salaryCurrency && enriched.salaryCurrency.trim().length > 0) { job.salaryCurrency = enriched.salaryCurrency; }
+                if (enriched.salaryPeriod && enriched.salaryPeriod.trim().length > 0) { job.salaryPeriod = enriched.salaryPeriod; }
+                if (enriched.remoteType && enriched.remoteType.trim().length > 0) { job.remoteType = enriched.remoteType; }
+                if (enriched.employmentType && enriched.employmentType.trim().length > 0) { job.employmentType = enriched.employmentType; }
+                if (enriched.location && enriched.location.trim().length > 0) { job.location = enriched.location; }
+                if (enriched.experienceMin !== null && enriched.experienceMin !== undefined) { job.experienceMin = enriched.experienceMin; }
+                if (enriched.experienceMax !== null && enriched.experienceMax !== undefined) { job.experienceMax = enriched.experienceMax; }
+
+                // Construct structured description for Candidate Fit
+                let currentDesc: any = {};
+                if (job.description) {
+                  try { currentDesc = typeof job.description === 'string' ? JSON.parse(job.description) : job.description; } catch(e) {}
+                }
+                const newDesc = {
+                  summary: (enriched.jobDescription && enriched.jobDescription.trim().length > 0) ? enriched.jobDescription : (currentDesc.summary || null),
+                  requiredSkills: (enriched.requiredSkills && enriched.requiredSkills.length > 0) ? enriched.requiredSkills : (currentDesc.requiredSkills || []),
+                  preferredSkills: (enriched.preferredSkills && enriched.preferredSkills.length > 0) ? enriched.preferredSkills : (currentDesc.preferredSkills || [])
+                };
+                // Store serialized description back into memory
+                job.description = JSON.stringify(newDesc);
+
+                // Run B6 Geographic Eligibility again with new data
+                const b6Result = evaluateGeographicEligibility(
+                  job.location,
+                  newDesc.summary,
+                  job.remoteType,
+                  config.candidateCountry
+                );
+                job.candidateRemoteEligibility = b6Result.eligibilityStatus === 'NEEDS_VERIFICATION' ? 'UNKNOWN' : b6Result.eligibilityStatus;
+                job.geographicRemoteScope = b6Result.remoteScope;
+                job.geographicEligibilityReason = b6Result.eligibilityReason;
+                job.geographicEligibilityConfidence = b6Result.eligibilityConfidence;
+
+                // Set the parsed description on the job object so Candidate Fit doesn't fail accessing it
+                job.description = newDesc as any;
+
+                // IMPORTANT: We must update the DB here so the enriched fields are persisted BEFORE QualifyJob runs.
+                await db.update(schema.jobs).set({
+                   salaryMin: job.salaryMin,
+                   salaryMax: job.salaryMax,
+                   salaryCurrency: job.salaryCurrency,
+                   salaryPeriod: job.salaryPeriod,
+                   remoteType: job.remoteType,
+                   employmentType: job.employmentType,
+                   location: job.location,
+                   experienceMin: job.experienceMin,
+                   experienceMax: job.experienceMax,
+                   description: JSON.stringify(newDesc),
+                   candidateRemoteEligibility: job.candidateRemoteEligibility,
+                   geographicRemoteScope: job.geographicRemoteScope,
+                   geographicEligibilityReason: job.geographicEligibilityReason,
+                   geographicEligibilityConfidence: job.geographicEligibilityConfidence
+                }).where(eq(schema.jobs.id, job.id));
+              }
+            } catch (e) {
+              console.warn(`[ENRICHMENT] Failed for job ${job.id}`, e);
+            }
+          } else {
+             // If we did not enrich, ensure job.description is an object for Candidate Fit
+             if (job.description && typeof job.description === 'string') {
+               try { job.description = JSON.parse(job.description); } catch(e) {}
+             }
+          }
 
           let qResult;
           if (!hasEvidence) {

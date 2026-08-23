@@ -1,4 +1,8 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, vi, it, expect, beforeAll, afterAll } from 'vitest';
+vi.mock("../lib/pipeline/html-enrichment.js", () => ({
+  enrichJobFromHtml: vi.fn().mockResolvedValue(null)
+}));
+
 import { db } from '../lib/db/client.js';
 import * as schema from '../lib/db/schema.js';
 import crypto from 'crypto';

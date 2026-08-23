@@ -198,6 +198,8 @@ describe('M9 Bugfixes: Orchestrator & Qualification', () => {
     }).returning({ id: schema.jobs.id }).then(async (res) => {
       const jobId = res[0]!.id;
       await db.insert(schema.jobObservations).values({ id: crypto.randomUUID(), jobId, runId, observedAt: new Date().toISOString() });
+      await db.insert(schema.jobSources).values([{ id: crypto.randomUUID(), jobId, sourceUrl: 'https://example.com/job', sourceType: 'SEARCH_RESULT', retrievedAt: new Date().toISOString() }]);
+      await db.insert(schema.researchArtifacts).values([{ id: crypto.randomUUID(), runId, entityType: 'JOB', entityId: jobId, workerType: 'SOURCE_VERIFICATION', rawContent: '<html></html>', createdAt: new Date().toISOString() }]);
       await db.insert(schema.researchArtifacts).values({
         id: crypto.randomUUID(),
         runId,
