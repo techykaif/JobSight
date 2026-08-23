@@ -20,20 +20,6 @@ export function runHardFilters(job: any, config: any, profile: CandidateProfile)
     reasons.push('JOB_CLOSED');
   }
 
-  // 3. Senior Title Filtering
-  if (job.title) {
-    const titleLower = job.title.toLowerCase();
-    const isSenior = /\b(senior|sr\.?|staff|principal|lead|manager|director|head|vp)\b/.test(titleLower);
-    
-    // If the hunt explicitly allows senior roles in alternativeRoles/targetRoles, we shouldn't reject.
-    const allConfigRoles = [...(config.targetRoles || []), ...(config.alternativeRoles || [])].map((r: string) => r.toLowerCase());
-    const expectsSenior = allConfigRoles.some((r: string) => /\b(senior|sr|staff|lead)\b/.test(r));
-
-    if (isSenior && !expectsSenior) {
-      passed = false;
-      reasons.push(`SENIOR_TITLE: ${job.title}`);
-    }
-  }
 
   // 4. Remote Requirement & Eligibility
   if (config.remoteRequirement === 'REMOTE_ONLY') {

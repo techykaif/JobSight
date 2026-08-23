@@ -13,7 +13,8 @@ export function evaluateCandidateDecision(
   hasProfileSnapshot: boolean,
   candidateFit: CandidateFitSignal | null | undefined,
   b7Decision: DecisionType | null | undefined,
-  geoEligibility: GeographicEligibilityResult | null | undefined
+  geoEligibility: GeographicEligibilityResult | null | undefined,
+  qualificationDecision?: { decision: string, reasons: string[] } | null
 ): CandidateDecisionResult {
   
   // RULE A: Geographic Veto (Highest Precedence)
@@ -29,6 +30,14 @@ export function evaluateCandidateDecision(
     return {
       finalDecision: 'INSUFFICIENT_EVIDENCE',
       primaryReason: 'No candidate profile snapshot exists for this run.'
+    };
+  }
+
+  // RULE B2: Explicit Experience Incompatibility
+  if (qualificationDecision?.decision === 'SKIP' && qualificationDecision.reasons.some(r => r.includes('EXTREME_EXPERIENCE_GAP'))) {
+    return {
+      finalDecision: 'INELIGIBLE',
+      primaryReason: 'Explicit experience incompatibility (EXTREME_EXPERIENCE_GAP).'
     };
   }
 

@@ -77,9 +77,12 @@ const companyOpportunityVariant = (l: string): 'success' | 'info' | 'warning' | 
 
 const companyInitials = (name: string): string => {
   const words = name.trim().split(/\s+/).filter(Boolean);
-  if (!words.length) return '?';
-  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
-  return `${words[0][0]}${words[words.length - 1][0]}`.toUpperCase();
+  const first = words[0];
+  if (!first) return '?';
+  if (words.length === 1) return first.slice(0, 2).toUpperCase();
+  const last = words[words.length - 1];
+  if (!last) return '?';
+  return `${first.charAt(0)}${last.charAt(0)}`.toUpperCase();
 };
 
 const companyHue = (name: string): number => {

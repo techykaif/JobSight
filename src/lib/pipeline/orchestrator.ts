@@ -295,6 +295,31 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
                    geographicEligibilityReason: job.geographicEligibilityReason,
                    geographicEligibilityConfidence: job.geographicEligibilityConfidence
                 }).where(eq(schema.jobs.id, job.id));
+
+                // RE-EVALUATE CANDIDATE FIT (after enrichment discovery of experience/skills)
+                try {
+                  const { evaluateCandidateFit } = await import('../candidate-fit/engine.js');
+                  const candidateJobPayload = {
+                    company: { name: 'Unknown' }, // Not used by fit logic directly, but required by schema
+                    job: {
+                      title: job.canonicalTitle || job.normalizedTitle || 'Unknown Role',
+                      url: 'http://internal.invalid',
+                      status: 'ACTIVE' as const
+                    },
+                    experience: {
+                      minYears: job.experienceMin,
+                      maxYears: job.experienceMax
+                    },
+                    description: {
+                      summary: newDesc.summary,
+                      requiredSkills: newDesc.requiredSkills,
+                      preferredSkills: newDesc.preferredSkills
+                    }
+                  };
+                  await evaluateCandidateFit(runId, job.id, candidateJobPayload);
+                } catch (fitErr) {
+                  console.warn(`[ENRICHMENT] Failed to re-evaluate candidate fit for job ${job.id}`, fitErr);
+                }
               }
             } catch (e) {
               console.warn(`[ENRICHMENT] Failed for job ${job.id}`, e);
@@ -1109,6 +1134,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
     const { evaluateCandidateDecision } = await import('../candidate-decision/engine.js');
     const b7Results = await db.select().from(schema.decisionResults).where(eq(schema.decisionResults.runId, runId));
     const fitResults = await db.select().from(schema.candidateFitResults).where(eq(schema.candidateFitResults.runId, runId));
+    const qualificationResults = await db.select().from(schema.decisions).where(eq(schema.decisions.runId, runId));
     const currentRun = await db.select({ profileSnapshot: schema.runs.profileSnapshot })
       .from(schema.runs)
       .where(eq(schema.runs.id, runId))
@@ -1127,11 +1153,14 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
         eligibilityReason: job.geographicEligibilityReason || ''
       };
 
+      const qualDec = qualificationResults.find((r: any) => r.jobId === job.id);
+
       const decision = evaluateCandidateDecision(
         hasSnapshot,
         fit as any,
         b7Dec?.decision as any,
-        geoEligibility as any
+        geoEligibility as any,
+        qualDec as any
       );
 
       await db.insert(schema.candidateDecisions)
