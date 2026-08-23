@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { Card } from './Card';
 import { StatusBadge } from './StatusBadge';
 import { SalaryBadge } from './SalaryBadge';
-import { ScoreBadge } from './ScoreBadge';
 import { ActionButton } from './ActionButton';
 
 export interface JobCardProps {
@@ -22,16 +21,10 @@ export interface JobCardProps {
   age?: string | undefined;
   decision?: string | undefined;
   primaryReason?: string | undefined;
-  // ── Intelligence extensions (D1.4) ──────────────────────────────
-  /** Application readiness level from B5 applicationResults */
   readiness?: string | undefined;
-  /** Company opportunity level from B3 companyOpportunity */
   companyOpportunity?: string | undefined;
-  /** Decision confidence 0–100 from decisionResults */
   confidence?: number | undefined;
-  /** Geographic eligibility from B6 candidateRemoteEligibility */
   eligibility?: string | undefined;
-  // ────────────────────────────────────────────────────────────────
   onClick?: (() => void) | undefined;
   className?: string | undefined;
 }
@@ -57,8 +50,6 @@ const decisionLabel = (d: string): string => {
 };
 
 const competitionVariant = (c: string): 'success' | 'warning' | 'danger' | 'neutral' => {
-  // Handles both the older discoveryIntelligence vocabulary (LOW/MEDIUM/HIGH)
-  // and the B2 competitionResults vocabulary (Very Low/Low/Medium/High/Very High).
   const normalized = c.trim().toLowerCase();
   if (normalized === 'low' || normalized === 'very low') return 'success';
   if (normalized === 'medium') return 'warning';
@@ -66,7 +57,6 @@ const competitionVariant = (c: string): 'success' | 'warning' | 'danger' | 'neut
   return 'neutral';
 };
 
-// ── Readiness variant helpers ────────────────────────────────────────────────
 const readinessVariant = (r: string): 'success' | 'info' | 'warning' | 'danger' | 'neutral' => {
   if (r === 'Ready Now') return 'success';
   if (r === 'Almost Ready') return 'info';
@@ -82,6 +72,50 @@ const companyOpportunityVariant = (l: string): 'success' | 'info' | 'warning' | 
   if (lower.includes('average')) return 'warning';
   if (lower.includes('weak')) return 'danger';
   return 'neutral';
+};
+
+const companyInitials = (name: string): string => {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return '?';
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return `${words[0][0]}${words[words.length - 1][0]}`.toUpperCase();
+};
+
+const companyHue = (name: string): number => {
+  let hash = 0;
+  for (let i = 0; i < name.length; i += 1) hash = (hash * 31 + name.charCodeAt(i)) | 0;
+  return Math.abs(hash) % 360;
+};
+
+const ScoreGauge: React.FC<{ score: number }> = ({ score }) => {
+  const clamped = Math.max(0, Math.min(100, score));
+  const radius = 16;
+  const circumference = 2 * Math.PI * radius;
+  const dash = (clamped / 100) * circumference;
+  const tone = clamped >= 75 ? 'var(--success)' : clamped >= 50 ? 'var(--warning)' : 'var(--danger)';
+
+  return (
+    <span
+      title={`Score: ${clamped}`}
+      aria-label={`Score: ${clamped}`}
+      style={{ position: 'relative', display: 'inline-flex', width: 40, height: 40, flexShrink: 0 }}
+    >
+      <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true" style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx="20" cy="20" r={radius} fill="none" stroke="var(--border-default)" strokeWidth="3" />
+        <circle
+          cx="20" cy="20" r={radius} fill="none" stroke={tone} strokeWidth="3" strokeLinecap="round"
+          strokeDasharray={`${dash} ${circumference - dash}`} style={{ transition: 'stroke-dasharray 0.3s ease' }}
+        />
+      </svg>
+      <span style={{
+        position: 'absolute', inset: 0, display: 'grid', placeItems: 'center',
+        fontFamily: 'var(--font-mono)', fontSize: '0.6875rem', fontWeight: 600,
+        fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)',
+      }}>
+        {Math.round(clamped)}
+      </span>
+    </span>
+  );
 };
 
 export const JobCard: React.FC<JobCardProps> = ({
@@ -112,6 +146,15 @@ export const JobCard: React.FC<JobCardProps> = ({
   };
 
   const stop = (e: React.MouseEvent) => e.stopPropagation();
+  const initials = companyInitials(company);
+  const hue = companyHue(company);
+
+  const secondaryBadgeStyle: React.CSSProperties = {
+    fontSize: '0.6875rem',
+    opacity: 0.82,
+    transform: 'scale(0.94)',
+    transformOrigin: 'left center',
+  };
 
   return (
     <Card
@@ -121,55 +164,53 @@ export const JobCard: React.FC<JobCardProps> = ({
       style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 'var(--space-4)' }}
       aria-label={`${title} at ${company}`}
     >
-      {/* 1. Company & Score Header */}
+      {/* Company + measured score */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-3)' }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          fontSize: '0.8125rem',
-          fontWeight: 500,
-          color: 'var(--text-secondary)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em'
-        }}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
-          </svg>
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
+          <span
+            aria-hidden="true"
+            style={{
+              width: 30, height: 30, borderRadius: 'var(--radius-md)', flexShrink: 0,
+              display: 'grid', placeItems: 'center',
+              background: `hsla(${hue}, 55%, 55%, 0.11)`,
+              border: `1px solid hsla(${hue}, 55%, 65%, 0.22)`,
+              color: `hsl(${hue}, 70%, 72%)`,
+              fontFamily: 'var(--font-mono)', fontSize: '0.625rem', fontWeight: 600,
+              letterSpacing: '-0.02em',
+            }}
+          >
+            {initials}
+          </span>
+          <span style={{
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)',
+            letterSpacing: '0.055em', textTransform: 'uppercase',
+          }}>
             {company}
           </span>
         </div>
         {score !== undefined && (
           <div onClick={stop} style={{ flexShrink: 0 }}>
-            <Link href={`/jobs?minScore=${score}`} style={{ textDecoration: 'none' }}>
-              <ScoreBadge score={score} />
+            <Link href={`/jobs?minScore=${score}`} style={{ textDecoration: 'none', display: 'inline-flex' }}>
+              <ScoreGauge score={score} />
             </Link>
           </div>
         )}
       </div>
 
-      {/* 2. Job Title */}
+      {/* Job title */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <h3 style={{
-          margin: 0,
-          fontSize: '1.125rem',
-          fontWeight: 600,
-          color: 'var(--text-primary)',
-          letterSpacing: '-0.01em',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          display: '-webkit-box',
-          WebkitLineClamp: 2,
-          WebkitBoxOrient: 'vertical',
-          lineHeight: 1.4,
+          margin: 0, fontSize: '1.0625rem', fontWeight: 600, color: 'var(--text-primary)',
+          letterSpacing: '-0.015em', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box',
+          WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', lineHeight: 1.4,
         }}>
           {title}
         </h3>
       </div>
 
-      {/* 3, 4, 5. Badges Row */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+      {/* Decision is primary; supporting facts are visually quieter. */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px' }}>
         {decision && decision !== 'PENDING' && (
           <div onClick={stop}>
             <Link href={`/jobs?decision=${encodeURIComponent(decision)}`} style={{ textDecoration: 'none' }}>
@@ -177,9 +218,9 @@ export const JobCard: React.FC<JobCardProps> = ({
             </Link>
           </div>
         )}
-        
+
         {salaryMin !== undefined && salaryMax !== undefined && (
-          <div onClick={stop}>
+          <div onClick={stop} style={secondaryBadgeStyle}>
             <Link href={`/jobs?salaryMin=${salaryMin}&salaryMax=${salaryMax}`} style={{ textDecoration: 'none' }}>
               <SalaryBadge min={salaryMin} max={salaryMax} />
             </Link>
@@ -187,20 +228,18 @@ export const JobCard: React.FC<JobCardProps> = ({
         )}
 
         {remote && (
-          <div onClick={stop}>
+          <div onClick={stop} style={secondaryBadgeStyle}>
             <Link href="/jobs?remote=REMOTE" style={{ textDecoration: 'none' }}>
               <StatusBadge
                 status={
                   eligibility === 'ELIGIBLE' ? 'Remote (Eligible)' :
                   eligibility === 'NOT_ELIGIBLE' ? 'Not Eligible' :
-                  eligibility === 'UNKNOWN' ? 'Remote (Unknown)' :
-                  'Remote'
+                  eligibility === 'UNKNOWN' ? 'Remote (Unknown)' : 'Remote'
                 }
                 variant={
                   eligibility === 'ELIGIBLE' ? 'success' :
                   eligibility === 'NOT_ELIGIBLE' ? 'danger' :
-                  eligibility === 'UNKNOWN' ? 'warning' :
-                  'info'
+                  eligibility === 'UNKNOWN' ? 'warning' : 'info'
                 }
               />
             </Link>
@@ -208,7 +247,7 @@ export const JobCard: React.FC<JobCardProps> = ({
         )}
 
         {competition && (
-          <div onClick={stop}>
+          <div onClick={stop} style={secondaryBadgeStyle}>
             <Link href={`/jobs?competition=${encodeURIComponent(competition)}`} style={{ textDecoration: 'none' }}>
               <StatusBadge status={`${competition} Comp`} variant={competitionVariant(competition)} />
             </Link>
@@ -216,7 +255,7 @@ export const JobCard: React.FC<JobCardProps> = ({
         )}
 
         {readiness && (
-          <div onClick={stop}>
+          <div onClick={stop} style={secondaryBadgeStyle}>
             <Link href={`/jobs/${id}`} style={{ textDecoration: 'none' }}>
               <StatusBadge status={readiness} variant={readinessVariant(readiness)} aria-label={`Readiness: ${readiness}`} />
             </Link>
@@ -224,7 +263,7 @@ export const JobCard: React.FC<JobCardProps> = ({
         )}
 
         {companyOpportunity && (
-          <div onClick={stop}>
+          <div onClick={stop} style={secondaryBadgeStyle}>
             <Link href={`/jobs/${id}`} style={{ textDecoration: 'none' }}>
               <StatusBadge status={companyOpportunity} variant={companyOpportunityVariant(companyOpportunity)} aria-label={`Company opportunity: ${companyOpportunity}`} />
             </Link>
@@ -232,39 +271,24 @@ export const JobCard: React.FC<JobCardProps> = ({
         )}
       </div>
 
-      {/* 6. Candidate Decision Reason */}
       {primaryReason && (
-        <div style={{ 
-          fontSize: '0.8125rem', 
-          color: 'var(--text-secondary)',
-          background: 'var(--bg-subtle)',
-          padding: 'var(--space-3)',
-          borderRadius: 'var(--radius-sm)',
-          borderLeft: '2px solid var(--accent)',
-          lineHeight: 1.5,
+        <div style={{
+          fontSize: '0.75rem', color: 'var(--text-secondary)', background: 'var(--bg-subtle)',
+          padding: 'var(--space-3)', borderRadius: 'var(--radius-sm)', borderLeft: '2px solid var(--accent)', lineHeight: 1.5,
         }}>
           <strong>Reason:</strong> {primaryReason}
         </div>
       )}
 
-      {/* 7 & 8. Footer row: Metadata & Actions */}
       <div className="job-card-footer" style={{
-        marginTop: 'auto',
-        paddingTop: 'var(--space-3)',
-        borderTop: '1px solid var(--border-subtle)',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: 'var(--space-2)',
+        marginTop: 'auto', paddingTop: 'var(--space-3)', borderTop: '1px solid var(--border-subtle)',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-2)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
           {age && (
             <span style={{
-              fontSize: '0.75rem',
-              color: 'var(--text-muted)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
+              fontSize: '0.6875rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4,
+              fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums',
             }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
@@ -273,15 +297,10 @@ export const JobCard: React.FC<JobCardProps> = ({
             </span>
           )}
           {confidence != null && confidence > 0 && (
-            <span
-              style={{
-                fontSize: '0.6875rem',
-                color: 'var(--text-muted)',
-                fontVariantNumeric: 'tabular-nums',
-                fontWeight: 500,
-              }}
-              aria-label={`Confidence: ${confidence}%`}
-            >
+            <span style={{
+              fontSize: '0.625rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)',
+              fontVariantNumeric: 'tabular-nums', fontWeight: 500,
+            }} aria-label={`Confidence: ${confidence}%`}>
               {confidence}% conf
             </span>
           )}
