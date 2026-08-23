@@ -90,6 +90,9 @@ export const jobs = sqliteTable('jobs', {
   salaryPeriodOriginal: text('salary_period_original'),
   salaryTextOriginal: text('salary_text_original'),
 
+  experienceMinOriginal: integer('experience_min_original'),
+  experienceMaxOriginal: integer('experience_max_original'),
+  descriptionOriginal: text('description_original'),
   experienceMin: integer('experience_min'),
   experienceMax: integer('experience_max'),
   description: text('description'),

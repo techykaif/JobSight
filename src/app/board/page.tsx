@@ -27,10 +27,11 @@ const COLUMNS = [
 
 export default async function DecisionBoardPage() {
   const jobsData = await db
-    .select({ id: schema.jobs.id, title: schema.jobs.canonicalTitle, companyId: schema.jobs.companyId, company: schema.companies.displayName, salaryMin: schema.jobs.salaryMin, salaryMax: schema.jobs.salaryMax, salaryCurrency: schema.jobs.salaryCurrency, remoteType: schema.jobs.remoteType, firstSeenAt: schema.jobs.firstSeenAt, decision: schema.decisions.decision, opportunityScore: schema.opportunityIntelligence.opportunityScore, competition: schema.discoveryIntelligence.competition, sourceType: schema.jobSources.sourceType })
+    .select({ id: schema.jobs.id, title: schema.jobs.canonicalTitle, companyId: schema.jobs.companyId, company: schema.companies.displayName, salaryMin: schema.jobs.salaryMin, salaryMax: schema.jobs.salaryMax, salaryCurrency: schema.jobs.salaryCurrency, remoteType: schema.jobs.remoteType, firstSeenAt: schema.jobs.firstSeenAt, decision: schema.decisions.decision, finalDecision: schema.candidateDecisions.finalDecision, opportunityScore: schema.opportunityIntelligence.opportunityScore, competition: schema.discoveryIntelligence.competition, sourceType: schema.jobSources.sourceType })
     .from(schema.jobs)
     .leftJoin(schema.companies, eq(schema.jobs.companyId, schema.companies.id))
     .leftJoin(schema.decisions, eq(schema.jobs.id, schema.decisions.jobId))
+    .leftJoin(schema.candidateDecisions, eq(schema.jobs.id, schema.candidateDecisions.jobId))
     .leftJoin(schema.opportunityIntelligence, eq(schema.jobs.id, schema.opportunityIntelligence.jobId))
     .leftJoin(schema.discoveryIntelligence, eq(schema.jobs.id, schema.discoveryIntelligence.jobId))
     .leftJoin(schema.jobSources, eq(schema.jobs.id, schema.jobSources.jobId))
@@ -70,11 +71,11 @@ export default async function DecisionBoardPage() {
   const companyOpportunityByCompanyId = latestByKey(companyOpportunityRows, r => r.companyId);
 
   const buckets: Record<string, typeof uniqueJobs> = {
-    'Apply Now': uniqueJobs.filter(j => j.decision === 'APPLY' || j.decision === 'APPLY_NOW'),
-    'Apply This Week': uniqueJobs.filter(j => j.decision === 'CONSIDER' || j.decision === 'APPLY_LATER'),
-    'Monitor': uniqueJobs.filter(j => j.decision === 'MONITOR' || (!j.decision && j.opportunityScore && j.opportunityScore > 70)),
-    'Research': uniqueJobs.filter(j => j.decision === 'RESEARCH_REQUIRED' || (!j.decision && (!j.opportunityScore || j.opportunityScore <= 70))),
-    'Rejected': uniqueJobs.filter(j => j.decision === 'SKIP' || j.decision === 'REJECTED'),
+    'Apply Now': uniqueJobs.filter(j => (j.finalDecision || 'PENDING') === 'APPLY'),
+    'Apply This Week': uniqueJobs.filter(j => (j.finalDecision || 'PENDING') === 'REVIEW'),
+    'Monitor': uniqueJobs.filter(j => (j.finalDecision || 'PENDING') === 'PENDING'),
+    'Research': uniqueJobs.filter(j => (j.finalDecision || 'PENDING') === 'INSUFFICIENT_EVIDENCE'),
+    'Rejected': uniqueJobs.filter(j => (j.finalDecision || 'PENDING') === 'SKIP' || (j.finalDecision || 'PENDING') === 'INELIGIBLE'),
   };
 
   const totalActive = (buckets['Apply Now']?.length ?? 0) + (buckets['Apply This Week']?.length ?? 0) + (buckets['Monitor']?.length ?? 0);

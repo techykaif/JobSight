@@ -125,6 +125,9 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   const decisionResultRec = await db.select().from(schema.decisionResults).where(eq(schema.decisionResults.jobId, job.id)).limit(1);
   const decisionResult = decisionResultRec[0];
 
+  const candidateDecisionRec = await db.select().from(schema.candidateDecisions).where(eq(schema.candidateDecisions.jobId, job.id)).limit(1);
+  const candidateDecision = candidateDecisionRec[0];
+
   // ── Job analysis ─────────────────────────────────────────────────────────────
   const analysisRec = await db.select().from(schema.jobAnalysis).where(eq(schema.jobAnalysis.jobId, job.id)).limit(1);
   const jobAnalysis = analysisRec[0];
@@ -211,7 +214,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   const originalSalary   = job.salaryTextOriginal || formatSalary(job.salaryMinOriginal, job.salaryMaxOriginal, job.salaryCurrencyOriginal, job.salaryPeriodOriginal);
 
   const formatDecisionText = (dec?: string | null) => dec?.replace(/_/g, ' ') || 'PENDING';
-  const decisionVal = decisionResult?.decision || decision?.decision || 'PENDING';
+  const decisionVal = candidateDecision?.finalDecision || 'PENDING';
 
   const title = job.canonicalTitle || job.normalizedTitle || 'Unknown Role';
 
@@ -655,15 +658,26 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
 
             {/* Decision badge prominent */}
             <div style={{ marginBottom: 16 }}>
+              <div style={{ marginBottom: 8, fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                FINAL DECISION
+              </div>
               <StatusBadge
                 status={formatDecisionText(decisionVal)}
                 variant={decisionVariant(decisionVal)}
               />
-              {decisionResult?.priority && (
-                <span style={{ marginLeft: 8, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  Priority: {decisionResult.priority}
-                </span>
-              )}
+            </div>
+
+            <div style={{ marginBottom: 24, paddingBottom: 16, borderBottom: '1px solid var(--border-hairline)' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
+                Reason
+              </div>
+              <div style={{ fontSize: '0.9375rem', lineHeight: 1.5, color: 'var(--text-primary)' }}>
+                {candidateDecision?.primaryReason || 'No final decision reason available.'}
+              </div>
+            </div>
+
+            <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 12 }}>
+              Supplementary Signals
             </div>
 
             {decisionResult?.urgencyLevel && (
