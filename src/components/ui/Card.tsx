@@ -12,7 +12,7 @@ export const Card = React.forwardRef<HTMLDivElement, CardProps>(
     return (
       <div
         ref={ref}
-        className={`${styles.card} ${styles[`padding-${padding}`]} ${
+        className={`ui-card ${styles.card} ${styles[`padding-${padding}`]} ${
           interactive ? styles.interactiveCard : ''
         } ${className}`}
         tabIndex={interactive ? 0 : undefined}
