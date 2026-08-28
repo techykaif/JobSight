@@ -3,6 +3,7 @@ import { db } from '../db/client.js';
 import * as schema from '../db/schema.js';
 import { eq, and } from 'drizzle-orm';
 import type { CandidateJob } from '../jobs/extractionSchema.js';
+import { buildNormalizedSkillSet, hasNormalizedSkill, normalizeSkill } from '../qualification/skills.js';
 
 export interface CandidateFitSignal {
   score: number;
@@ -64,17 +65,22 @@ export async function evaluateCandidateFit(
   const matchedSkills: string[] = [];
   const missingSkills: string[] = [];
 
-  const profileSkills = Array.isArray(profile.skills) ? profile.skills.map((s: string) => s.toLowerCase().trim()) : [];
+  // BUG-002 fix: include profile.technologies alongside profile.skills (consistent with qualification engine)
+  const profileSkillSet = buildNormalizedSkillSet(
+    Array.isArray(profile.skills) ? profile.skills : [],
+    Array.isArray(profile.technologies) ? profile.technologies : []
+  );
   const requiredSkills = Array.isArray(jobMetadata.description?.requiredSkills)
-    ? jobMetadata.description!.requiredSkills.map(s => s.toLowerCase().trim())
+    ? jobMetadata.description!.requiredSkills
     : [];
 
   if (requiredSkills.length > 0) {
     for (const skill of requiredSkills) {
-      if (profileSkills.some((ps: string) => ps.includes(skill) || skill.includes(ps))) {
-        matchedSkills.push(skill);
+      // BUG-001 fix: use canonical normalized exact matching (no substring matching)
+      if (hasNormalizedSkill(profileSkillSet, skill)) {
+        matchedSkills.push(normalizeSkill(skill));
       } else {
-        missingSkills.push(skill);
+        missingSkills.push(normalizeSkill(skill));
       }
     }
 

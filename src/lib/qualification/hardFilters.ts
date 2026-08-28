@@ -1,5 +1,6 @@
 import type { HardFilterResult } from './schema.js';
 import type { CandidateProfile } from './schema.js';
+import { buildNormalizedSkillSet, hasNormalizedSkill } from './skills.js';
 
 export function runHardFilters(job: any, config: any, profile: CandidateProfile): HardFilterResult {
   const reasons: string[] = [];
@@ -20,6 +21,32 @@ export function runHardFilters(job: any, config: any, profile: CandidateProfile)
     reasons.push('JOB_CLOSED');
   }
 
+  // 3. Mandatory Skill Requirements
+  const rawRequiredSkills = job.description?.requiredSkills;
+
+  if (rawRequiredSkills === null || rawRequiredSkills === undefined) {
+    // Requirements are unknown/unavailable — do NOT veto, track as unknown
+    unknowns.push('requiredSkills');
+  } else if (Array.isArray(rawRequiredSkills) && rawRequiredSkills.length > 0) {
+    // Known, non-empty mandatory skill requirements — check for 0% match
+    const candidateSkillSet = buildNormalizedSkillSet(
+      profile.skills || [],
+      profile.technologies || []
+    );
+
+    let matchedCount = 0;
+    for (const reqSkill of rawRequiredSkills) {
+      if (hasNormalizedSkill(candidateSkillSet, reqSkill)) {
+        matchedCount++;
+      }
+    }
+
+    if (matchedCount === 0) {
+      passed = false;
+      reasons.push(`MISSING_MANDATORY_SKILLS: Candidate matches 0/${rawRequiredSkills.length} required skills [${rawRequiredSkills.join(', ')}]`);
+    }
+  }
+  // else: rawRequiredSkills is [] — explicitly no mandatory requirements, do NOT veto
 
   // 4. Remote Requirement & Eligibility
   if (config.remoteRequirement === 'REMOTE_ONLY') {

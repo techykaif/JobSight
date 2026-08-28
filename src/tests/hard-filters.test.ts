@@ -148,3 +148,92 @@ describe('Salary Disclosure Filtering', () => {
     expect(result.passed).toBe(true);
   });
 });
+
+describe('Mandatory Skill Filtering', () => {
+  const profileWithSkills: CandidateProfile = {
+    ...baseProfile,
+    skills: ['React', 'TypeScript'],
+    technologies: ['AWS', 'PostgreSQL']
+  };
+
+  it('1. Required skill present -> PASS', () => {
+    const job = {
+      ...baseJob,
+      description: { requiredSkills: ['React'] }
+    };
+    const result = runHardFilters(job, baseConfig, profileWithSkills);
+    expect(result.passed).toBe(true);
+    expect(result.unknowns).not.toContain('requiredSkills');
+  });
+
+  it('2. 100% missing required skills -> HARD VETO', () => {
+    const job = {
+      ...baseJob,
+      description: { requiredSkills: ['Java', 'Spring Boot'] }
+    };
+    const result = runHardFilters(job, baseConfig, profileWithSkills);
+    expect(result.passed).toBe(false);
+    expect(result.reasons.some(r => r.includes('MISSING_MANDATORY_SKILLS'))).toBe(true);
+  });
+
+  it('3. Multiple required skills, partial match -> PASS (not hard veto)', () => {
+    const job = {
+      ...baseJob,
+      description: { requiredSkills: ['React', 'Java'] }
+    };
+    const result = runHardFilters(job, baseConfig, profileWithSkills);
+    expect(result.passed).toBe(true);
+  });
+
+  it('4. Preferred skill missing -> PASS (no veto)', () => {
+    const job = {
+      ...baseJob,
+      description: { preferredSkills: ['Java'] }
+    };
+    const result = runHardFilters(job, baseConfig, profileWithSkills);
+    expect(result.passed).toBe(true);
+  });
+
+  it('5. requiredSkills = [] -> PASS (no veto)', () => {
+    const job = {
+      ...baseJob,
+      description: { requiredSkills: [] }
+    };
+    const result = runHardFilters(job, baseConfig, profileWithSkills);
+    expect(result.passed).toBe(true);
+    expect(result.unknowns).not.toContain('requiredSkills');
+  });
+
+  it('6. requiredSkills = null -> PASS (adds to unknowns)', () => {
+    const job = {
+      ...baseJob,
+      description: { requiredSkills: null }
+    };
+    const result = runHardFilters(job, baseConfig, profileWithSkills);
+    expect(result.passed).toBe(true);
+    expect(result.unknowns).toContain('requiredSkills');
+  });
+
+  it('7. requiredSkills = undefined -> PASS (adds to unknowns)', () => {
+    const job = {
+      ...baseJob,
+      description: {}
+    };
+    const result = runHardFilters(job, baseConfig, profileWithSkills);
+    expect(result.passed).toBe(true);
+    expect(result.unknowns).toContain('requiredSkills');
+  });
+
+  it('10. Node matches Node.js (alias match)', () => {
+    const job = {
+      ...baseJob,
+      description: { requiredSkills: ['Node.js'] }
+    };
+    const profile = {
+      ...baseProfile,
+      skills: ['node']
+    };
+    const result = runHardFilters(job, baseConfig, profile);
+    expect(result.passed).toBe(true);
+  });
+});

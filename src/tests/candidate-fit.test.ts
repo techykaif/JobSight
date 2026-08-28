@@ -401,4 +401,124 @@ describe('D1.7.4 Candidate Fit Intelligence', () => {
       expect(results.length).toBe(2);
     });
   });
+
+  describe('D1.7.4 Canonical Skill Matching Fixes (Phase 5)', () => {
+    it('7. Java must NOT match JavaScript', async () => {
+      await insertTestJob('job-fix-1');
+      const noRoleSkillRunId = crypto.randomUUID();
+      await db.insert(schema.runs).values({
+        id: noRoleSkillRunId,
+        configId: 'fit-config-1',
+        status: 'RUNNING',
+        currentStage: 'INGESTION',
+        profileSnapshot: {
+          profileId: 'temp', profileName: 'temp', snapshotAt: new Date().toISOString(),
+          profile: { skills: ['JavaScript'] }
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+
+      const job = getBaseJob({
+        job: { title: 'Engineer', url: 'http://test.com', status: 'ACTIVE' },
+        description: { requiredSkills: ['Java'] }
+      });
+
+      const result = await evaluateCandidateFit(noRoleSkillRunId, 'job-fix-1', job);
+      expect(result!.matchedSkills).not.toContain('Java');
+      expect(result!.missingSkills).toContain('Java');
+      expect(result!.dimensions.skills).toBe(0);
+
+      await db.delete(schema.candidateFitResults).where(eq(schema.candidateFitResults.runId, noRoleSkillRunId));
+      await db.delete(schema.runs).where(eq(schema.runs.id, noRoleSkillRunId));
+    });
+
+    it('8. React must NOT match React Native', async () => {
+      await insertTestJob('job-fix-2');
+      const run2Id = crypto.randomUUID();
+      await db.insert(schema.runs).values({
+        id: run2Id,
+        configId: 'fit-config-1',
+        status: 'RUNNING',
+        currentStage: 'INGESTION',
+        profileSnapshot: {
+          profileId: 'temp', profileName: 'temp', snapshotAt: new Date().toISOString(),
+          profile: { skills: ['React'] }
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+
+      const job = getBaseJob({
+        job: { title: 'Engineer', url: 'http://test.com', status: 'ACTIVE' },
+        description: { requiredSkills: ['React Native'] }
+      });
+
+      const result = await evaluateCandidateFit(run2Id, 'job-fix-2', job);
+      expect(result!.matchedSkills).not.toContain('React Native');
+      expect(result!.dimensions.skills).toBe(0);
+
+      await db.delete(schema.candidateFitResults).where(eq(schema.candidateFitResults.runId, run2Id));
+      await db.delete(schema.runs).where(eq(schema.runs.id, run2Id));
+    });
+
+    it('9. SQL must NOT match PostgreSQL', async () => {
+      await insertTestJob('job-fix-3');
+      const run3Id = crypto.randomUUID();
+      await db.insert(schema.runs).values({
+        id: run3Id,
+        configId: 'fit-config-1',
+        status: 'RUNNING',
+        currentStage: 'INGESTION',
+        profileSnapshot: {
+          profileId: 'temp', profileName: 'temp', snapshotAt: new Date().toISOString(),
+          profile: { skills: ['PostgreSQL'] }
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+
+      const job = getBaseJob({
+        job: { title: 'Engineer', url: 'http://test.com', status: 'ACTIVE' },
+        description: { requiredSkills: ['SQL'] }
+      });
+
+      const result = await evaluateCandidateFit(run3Id, 'job-fix-3', job);
+      expect(result!.matchedSkills).not.toContain('SQL');
+      expect(result!.dimensions.skills).toBe(0);
+
+      await db.delete(schema.candidateFitResults).where(eq(schema.candidateFitResults.runId, run3Id));
+      await db.delete(schema.runs).where(eq(schema.runs.id, run3Id));
+    });
+
+    it('12. Candidate technologies are included in Candidate Fit', async () => {
+      await insertTestJob('job-fix-4');
+      const run4Id = crypto.randomUUID();
+      await db.insert(schema.runs).values({
+        id: run4Id,
+        configId: 'fit-config-1',
+        status: 'RUNNING',
+        currentStage: 'INGESTION',
+        profileSnapshot: {
+          profileId: 'temp', profileName: 'temp', snapshotAt: new Date().toISOString(),
+          profile: { skills: ['JavaScript'], technologies: ['AWS'] }
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+
+      const job = getBaseJob({
+        job: { title: 'Engineer', url: 'http://test.com', status: 'ACTIVE' },
+        description: { requiredSkills: ['AWS', 'JavaScript'] }
+      });
+
+      const result = await evaluateCandidateFit(run4Id, 'job-fix-4', job);
+      expect(result!.matchedSkills).toContain('AWS');
+      expect(result!.matchedSkills).toContain('JavaScript');
+      expect(result!.dimensions.skills).toBe(100);
+
+      await db.delete(schema.candidateFitResults).where(eq(schema.candidateFitResults.runId, run4Id));
+      await db.delete(schema.runs).where(eq(schema.runs.id, run4Id));
+    });
+  });
 });
