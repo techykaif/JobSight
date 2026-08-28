@@ -11,7 +11,7 @@ import { desc, inArray } from 'drizzle-orm';
 export async function getActiveRun() {
   const activeRunRes = await db.select()
     .from(schema.runs)
-    .where(inArray(schema.runs.status, ['RUNNING', 'PAUSED', 'COMPLETED']))
+    .where(inArray(schema.runs.status, ['RUNNING', 'PAUSED', 'COMPLETED', 'COMPLETED_WITH_FAILURES']))
     .orderBy(desc(schema.runs.createdAt))
     .limit(1);
   return activeRunRes[0] || null;

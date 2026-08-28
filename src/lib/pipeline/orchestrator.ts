@@ -1054,7 +1054,13 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
       const discRec = await db.select().from(schema.oppDiscoveryResults).where(eq(schema.oppDiscoveryResults.jobId, job.id)).limit(1);
       const discSigs = await db.select().from(schema.oppDiscoverySignals).where(eq(schema.oppDiscoverySignals.jobId, job.id));
 
-      const oppRec = await db.select().from(schema.opportunityIntelligence).where(eq(schema.opportunityIntelligence.jobId, job.id)).limit(1);
+      const mktRec = await db.select()
+        .from(schema.marketIntelligence)
+        .where(and(
+          eq(schema.marketIntelligence.jobId, job.id),
+          eq(schema.marketIntelligence.runId, runId)
+        ))
+        .limit(1);
 
       const discovery = {
         result: discRec[0] || { level: 'STANDARD', score: 50, confidence: 50 },
@@ -1070,7 +1076,34 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
         discovery.competition = discSumRec[0].competition;
       }
 
-      const opportunity = oppRec[0] || { opportunityScore: 50, priority: 'NORMAL', recommendedAction: 'CONSIDER' };
+      let opportunityScore = 50;
+      let priority = 'NORMAL';
+      let recommendedAction = 'Consider applying';
+
+      if (mktRec[0]) {
+        if (mktRec[0].opportunityIntelligence === 'FAVORABLE') {
+          opportunityScore = 85;
+          priority = 'URGENT';
+          recommendedAction = 'Apply immediately (Highly Favorable Market Condition)';
+        } else if (mktRec[0].opportunityIntelligence === 'NEUTRAL') {
+          opportunityScore = 65;
+          priority = 'HIGH';
+          recommendedAction = 'Prioritize application (Favorable conditions)';
+        } else if (mktRec[0].opportunityIntelligence === 'UNFAVORABLE') {
+          opportunityScore = 30;
+          priority = 'LOW';
+          recommendedAction = 'Skip due to unfavorable market condition';
+        } else if (mktRec[0].opportunityIntelligence === 'INSUFFICIENT_EVIDENCE') {
+          opportunityScore = 50;
+          priority = 'NORMAL';
+        }
+      }
+
+      const opportunity = {
+        opportunityScore,
+        priority,
+        recommendedAction
+      };
 
       const context = {
         job,
