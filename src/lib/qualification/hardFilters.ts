@@ -21,32 +21,16 @@ export function runHardFilters(job: any, config: any, profile: CandidateProfile)
     reasons.push('JOB_CLOSED');
   }
 
-  // 3. Mandatory Skill Requirements
+  // 3. Mandatory Skill Requirements (LLM extraction safety reversal)
   const rawRequiredSkills = job.description?.requiredSkills;
 
   if (rawRequiredSkills === null || rawRequiredSkills === undefined) {
     // Requirements are unknown/unavailable — do NOT veto, track as unknown
     unknowns.push('requiredSkills');
-  } else if (Array.isArray(rawRequiredSkills) && rawRequiredSkills.length > 0) {
-    // Known, non-empty mandatory skill requirements — check for 0% match
-    const candidateSkillSet = buildNormalizedSkillSet(
-      profile.skills || [],
-      profile.technologies || []
-    );
-
-    let matchedCount = 0;
-    for (const reqSkill of rawRequiredSkills) {
-      if (hasNormalizedSkill(candidateSkillSet, reqSkill)) {
-        matchedCount++;
-      }
-    }
-
-    if (matchedCount === 0) {
-      passed = false;
-      reasons.push(`MISSING_MANDATORY_SKILLS: Candidate matches 0/${rawRequiredSkills.length} required skills [${rawRequiredSkills.join(', ')}]`);
-    }
   }
-  // else: rawRequiredSkills is [] — explicitly no mandatory requirements, do NOT veto
+  // We no longer hard-veto 0% match here because rawRequiredSkills is unconstrained LLM text.
+  // Skill gaps are handled via heavy scoring penalties in Candidate Fit & Qualification Scoring.
+
 
   // 4. Remote Requirement & Eligibility
   if (config.remoteRequirement === 'REMOTE_ONLY') {
@@ -66,7 +50,7 @@ export function runHardFilters(job: any, config: any, profile: CandidateProfile)
   }
 
   // 5. Salary Disclosure Requirement
-  const hasSalary = (job.salaryMinOriginal !== null && job.salaryMinOriginal !== undefined) || 
+  const hasSalary = (job.salaryMinOriginal !== null && job.salaryMinOriginal !== undefined) ||
                     (job.salaryMaxOriginal !== null && job.salaryMaxOriginal !== undefined) ||
                     (job.salaryTextOriginal && job.salaryTextOriginal.trim() !== '');
 

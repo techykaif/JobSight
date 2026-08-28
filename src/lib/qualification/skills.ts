@@ -24,7 +24,6 @@ export const SKILL_ALIASES: Record<string, string> = {
   'k8s': 'Kubernetes',
   'kubernetes': 'Kubernetes',
   'docker': 'Docker',
-  'containerization': 'Docker',
 };
 
 export function normalizeSkill(skill: string): string {

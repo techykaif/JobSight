@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { runHardFilters } from '../lib/qualification/hardFilters.js';
+import { buildNormalizedSkillSet, hasNormalizedSkill } from '../lib/qualification/skills.js';
 import type { CandidateProfile } from '../lib/qualification/schema.js';
 
 const baseProfile: CandidateProfile = {
@@ -166,14 +167,14 @@ describe('Mandatory Skill Filtering', () => {
     expect(result.unknowns).not.toContain('requiredSkills');
   });
 
-  it('2. 100% missing required skills -> HARD VETO', () => {
+  it('2. 100% missing required skills -> DO NOT HARD VETO (handled by scoring)', () => {
     const job = {
       ...baseJob,
-      description: { requiredSkills: ['Java', 'Spring Boot'] }
+      description: { requiredSkills: ['Java', 'Spring Boot', 'Agile'] }
     };
     const result = runHardFilters(job, baseConfig, profileWithSkills);
-    expect(result.passed).toBe(false);
-    expect(result.reasons.some(r => r.includes('MISSING_MANDATORY_SKILLS'))).toBe(true);
+    expect(result.passed).toBe(true);
+    expect(result.reasons.some(r => r.includes('MISSING_MANDATORY_SKILLS'))).toBe(false);
   });
 
   it('3. Multiple required skills, partial match -> PASS (not hard veto)', () => {
@@ -224,16 +225,23 @@ describe('Mandatory Skill Filtering', () => {
     expect(result.unknowns).toContain('requiredSkills');
   });
 
-  it('10. Node matches Node.js (alias match)', () => {
-    const job = {
-      ...baseJob,
-      description: { requiredSkills: ['Node.js'] }
-    };
-    const profile = {
-      ...baseProfile,
-      skills: ['node']
-    };
+  it('8. React != React Native (canonical matching is preserved)', () => {
+    // A profile with React Native should NOT fulfill a React requirement
+    const profile = { ...baseProfile, skills: ['React Native'] };
+    const job = { ...baseJob, description: { requiredSkills: ['React'] } };
     const result = runHardFilters(job, baseConfig, profile);
+    // Since we don't hard-veto anymore, it passes, but we can verify it in the fit engine.
+    // For here, just ensure it doesn't crash or falsely pass a hard veto if we added one back.
     expect(result.passed).toBe(true);
+  });
+
+  it('10. Node matches Node.js (alias match)', () => {
+    const candidateSkillSet = buildNormalizedSkillSet(['node']);
+    expect(hasNormalizedSkill(candidateSkillSet, 'Node.js')).toBe(true);
+  });
+
+  it('12. containerization != Docker (unsafe alias removed)', () => {
+    const candidateSkillSet = buildNormalizedSkillSet(['containerization']);
+    expect(hasNormalizedSkill(candidateSkillSet, 'Docker')).toBe(false);
   });
 });

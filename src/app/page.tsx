@@ -59,20 +59,44 @@ const HUNT_DOT_COLOR: Record<string, string> = {
 
 // ─── page ────────────────────────────────────────────────────────────────────
 
+import { getActiveRun } from '@/lib/pipeline/active-run';
+
 export default async function DashboardPage() {
+  const latestRun = await getActiveRun();
+
   // ── Core counts ────────────────────────────────────────────────────────────
   const jobsCountRes = await db.select({ count: sql<number>`count(*)` }).from(schema.jobs);
   const totalJobs = Number(jobsCountRes[0]?.count ?? 0);
 
-  const decisionsRes = await db.select({
-    decision: schema.decisions.decision,
-    count:    sql<number>`count(*)`,
-  }).from(schema.decisions).groupBy(schema.decisions.decision);
+  const cdRes = latestRun
+    ? await db.select({
+        finalDecision: schema.candidateDecisions.finalDecision,
+        count: sql<number>`count(*)`,
+      }).from(schema.candidateDecisions)
+        .where(eq(schema.candidateDecisions.runId, latestRun.id))
+        .groupBy(schema.candidateDecisions.finalDecision)
+    : [];
 
-  const applyCount     = Number(decisionsRes.find(d => d.decision === 'APPLY')?.count     ?? 0);
-  const considerCount  = Number(decisionsRes.find(d => d.decision === 'CONSIDER')?.count  ?? 0);
-  const skipCount      = Number(decisionsRes.find(d => d.decision === 'SKIP')?.count      ?? 0);
-  const qualifiedJobs  = totalJobs - skipCount;
+  const decisionsRes = latestRun
+    ? await db.select({
+        decision: schema.decisions.decision,
+        count: sql<number>`count(*)`,
+      }).from(schema.decisions)
+        .where(eq(schema.decisions.runId, latestRun.id))
+        .groupBy(schema.decisions.decision)
+    : [];
+
+  const applyCount        = Number(cdRes.find(d => d.finalDecision === 'APPLY')?.count ?? 0);
+  const applyThisWeekCount= Number(cdRes.find(d => d.finalDecision === 'REVIEW')?.count ?? 0);
+  const researchCount     = Number(cdRes.find(d => d.finalDecision === 'INSUFFICIENT_EVIDENCE')?.count ?? 0);
+  const rejectedCount     = Number(cdRes.find(d => d.finalDecision === 'SKIP' || d.finalDecision === 'INELIGIBLE')?.count ?? 0);
+
+  const latestTotalJobsRes = latestRun
+    ? await db.select({ count: sql<number>`count(*)` }).from(schema.jobObservations).where(eq(schema.jobObservations.runId, latestRun.id))
+    : [{ count: 0 }];
+  const latestTotalJobs = Number(latestTotalJobsRes[0]?.count ?? 0);
+  const latestSkipCount = Number(decisionsRes.find(d => d.decision === 'SKIP')?.count ?? 0);
+  const qualifiedJobs = latestTotalJobs - latestSkipCount;
 
   const watchlistsRes  = await db.select({ count: sql<number>`count(*)` }).from(schema.watchlists);
   const monitorCount   = Number(watchlistsRes[0]?.count ?? 0);
@@ -120,21 +144,28 @@ export default async function DashboardPage() {
     .from(schema.runs)
     .orderBy(desc(schema.runs.createdAt))
     .limit(1);
-  const latestRun = latestRunRes[0] ?? null;
+
 
   // ── Priority opportunities (top APPLY + CONSIDER jobs) ─────────────────────
-  // We want the top 6 jobs that have APPLY or CONSIDER decision,
+  // We want the top 6 jobs that have APPLY or REVIEW decision from the active run,
   // joined with their company name, and enriched with competition + decision data.
   // Because this is a server component using drizzle with SQLite we do a simpler
-  // approach: fetch decisions for APPLY/CONSIDER, get their job IDs, then fetch jobs.
+  // approach: fetch candidate decisions for APPLY/REVIEW from active run
 
-  const actionableDecisions = await db.select({
-    jobId:    schema.decisions.jobId,
-    decision: schema.decisions.decision,
-  })
-    .from(schema.decisions)
-    .where(inArray(schema.decisions.decision, ['APPLY', 'CONSIDER']))
-    .limit(6);
+  const actionableDecisions = latestRun
+    ? await db.select({
+        jobId:    schema.candidateDecisions.jobId,
+        decision: schema.candidateDecisions.finalDecision,
+      })
+        .from(schema.candidateDecisions)
+        .where(
+          and(
+            eq(schema.candidateDecisions.runId, latestRun.id),
+            inArray(schema.candidateDecisions.finalDecision, ['APPLY', 'REVIEW'])
+          )
+        )
+        .limit(6)
+    : [];
 
   const priorityJobIds = actionableDecisions.map(d => d.jobId);
 
@@ -306,7 +337,7 @@ export default async function DashboardPage() {
               <MetricCard
                 href="/board"
                 label="Apply This Week"
-                value={considerCount}
+                value={applyThisWeekCount}
                 icon={
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--warning-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
