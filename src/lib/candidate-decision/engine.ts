@@ -14,7 +14,8 @@ export function evaluateCandidateDecision(
   candidateFit: CandidateFitSignal | null | undefined,
   b7Decision: DecisionType | null | undefined,
   geoEligibility: GeographicEligibilityResult | null | undefined,
-  qualificationDecision?: { decision: string, reasons: string[] } | null
+  qualificationDecision?: { decision: string, reasons: string[] } | null,
+  marketIntelligence?: { opportunityIntelligence: string, visibilityLevel: string, competitionLevel: string } | null
 ): CandidateDecisionResult {
   
   // RULE A: Geographic Veto (Highest Precedence)
@@ -33,11 +34,30 @@ export function evaluateCandidateDecision(
     };
   }
 
-  // RULE B2: Explicit Experience Incompatibility
+  // RULE B2: Explicit Experience Incompatibility (STRETCH POLICY)
   if (qualificationDecision?.decision === 'SKIP' && qualificationDecision.reasons.some(r => r.includes('EXTREME_EXPERIENCE_GAP'))) {
+    // Insufficient evidence cannot become a Stretch opportunity
+    if (!candidateFit || candidateFit.level === 'insufficient_evidence') {
+      return {
+        finalDecision: 'INELIGIBLE',
+        primaryReason: 'Explicit experience incompatibility (EXTREME_EXPERIENCE_GAP).'
+      };
+    }
+
+    // Check if the opportunity is exceptional via explicit market intelligence (not B7)
+    if (
+      marketIntelligence?.opportunityIntelligence === 'FAVORABLE' &&
+      marketIntelligence?.visibilityLevel === 'LOW' &&
+      marketIntelligence?.competitionLevel === 'LOW'
+    ) {
+      return {
+        finalDecision: 'REVIEW',
+        primaryReason: 'Stretch opportunity: exceptional market conditions despite an extreme experience gap.'
+      };
+    }
     return {
       finalDecision: 'INELIGIBLE',
-      primaryReason: 'Explicit experience incompatibility (EXTREME_EXPERIENCE_GAP).'
+      primaryReason: 'Stretch criteria failed: Market conditions not exceptional (EXTREME_EXPERIENCE_GAP).'
     };
   }
 

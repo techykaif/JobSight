@@ -9,7 +9,7 @@ export class IgnoreStrategy implements DecisionStrategy {
   priority(): number { return 100; } // Very high priority if it hits ignore criteria
 
   supports(context: DecisionContext): boolean {
-    return context.opportunity.priority === 'IGNORE' || context.discovery.authenticity === 'VERY_LOW';
+    return context.opportunity.priority === 'IGNORE' || context.opportunity.priority === 'LOW' || context.discovery.authenticity === 'VERY_LOW';
   }
 
   evaluate(context: DecisionContext): DecisionResult | null {

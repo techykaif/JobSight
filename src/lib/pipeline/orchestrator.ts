@@ -1042,12 +1042,18 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
       ['APPLY', 'CONSIDER', 'RESEARCH_REQUIRED'].includes(d.decision) && validJobsMap.has(d.jobId)
     );
 
+    const stretchDecisions = finalEligibleDecisions.filter(d =>
+      d.decision === 'SKIP' && Array.isArray(d.reasons) && d.reasons.some((r: any) => typeof r === 'string' && r.includes('EXTREME_EXPERIENCE_GAP')) && validJobsMap.has(d.jobId)
+    );
+
     const { runDecisionEngine, generateDecisionQueue } = await import('../decision/engine.js');
     const { calculateB7Modifiers } = await import('../adaptive-learning/engine.js');
 
     const decisionsWithContext = [];
 
-    for (const ed of eligibleDecisions) {
+    const allDecisionsToEvaluate = [...eligibleDecisions];
+
+    for (const ed of allDecisionsToEvaluate) {
       const job = validJobsMap.get(ed.jobId);
 
       // Load intelligence results needed for context
@@ -1108,6 +1114,8 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
       const context = {
         job,
         runId,
+        configId: config.id,
+        marketIntelligence: mktRec[0] || null,
         discovery: discovery as any,
         opportunity: opportunity as any
       };
@@ -1168,6 +1176,8 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
       });
     }
 
+
+
     // 5. Candidate Decision Intelligence (D1.7.5)
     await updateState('CANDIDATE_DECISION', 'DECISION');
 
@@ -1175,6 +1185,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
     const b7Results = await db.select().from(schema.decisionResults).where(eq(schema.decisionResults.runId, runId));
     const fitResults = await db.select().from(schema.candidateFitResults).where(eq(schema.candidateFitResults.runId, runId));
     const qualificationResults = await db.select().from(schema.decisions).where(eq(schema.decisions.runId, runId));
+    const marketIntelligences = await db.select().from(schema.marketIntelligence).where(eq(schema.marketIntelligence.runId, runId));
     const currentRun = await db.select({ profileSnapshot: schema.runs.profileSnapshot })
       .from(schema.runs)
       .where(eq(schema.runs.id, runId))
@@ -1185,6 +1196,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
     for (const job of validJobsMap.values()) {
       const b7Dec = b7Results.find(r => r.jobId === job.id);
       const fit = fitResults.find(r => r.jobId === job.id);
+      const mktInt = marketIntelligences.find(r => r.jobId === job.id);
 
       const geoEligibility = {
         eligibilityStatus: job.candidateRemoteEligibility as 'ELIGIBLE' | 'NOT_ELIGIBLE' | 'NEEDS_VERIFICATION' | undefined,
@@ -1200,7 +1212,8 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
         fit as any,
         b7Dec?.decision as any,
         geoEligibility as any,
-        qualDec as any
+        qualDec as any,
+        mktInt as any
       );
 
       await db.insert(schema.candidateDecisions)
