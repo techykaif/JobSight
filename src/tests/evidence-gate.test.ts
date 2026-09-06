@@ -114,9 +114,9 @@ describe('Evidence Gate Regression Tests', () => {
     expect(dec[0]?.reasons).toContain('Insufficient verified source evidence.');
 
     const scores = await db.select().from(schema.scores).where(eq(schema.scores.jobId, jobId));
-    // Since we output { resumeMatch: 0, requirementMatch: 0, opportunity: 0 } we will see zeroes instead of 100/100.
+    // Since we output { resumeMatch: 0, requirementMatch: 0, opportunity: 0 } initially, but Market Intelligence upgrades OPPORTUNITY to baseline 50 for INSUFFICIENT_EVIDENCE.
     const oppScore = scores.find(s => s.scoreType === 'OPPORTUNITY');
-    expect(oppScore?.scoreValue).toBe(0);
+    expect(oppScore?.scoreValue).toBe(50);
   });
 
   it('3. Job with verified source content continues through qualification', async () => {

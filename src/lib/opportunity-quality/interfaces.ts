@@ -1,0 +1,23 @@
+export type OpportunityLevel = 'FAVORABLE' | 'NEUTRAL' | 'UNFAVORABLE' | 'INSUFFICIENT_EVIDENCE';
+export type ConfidenceLevel = 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
+
+export type SignalLevel = 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
+export type CompensationSignalLevel = 'EXCEPTIONAL' | 'TARGET' | 'BELOW_TARGET' | 'UNKNOWN';
+export type FreshnessSignalLevel = 'NEW' | 'AGING' | 'STALE' | 'UNKNOWN';
+
+export interface OpportunityQualitySignals {
+  visibility: SignalLevel;
+  competition: SignalLevel;
+  applicantVolume: number | 'UNKNOWN';
+  compensation: CompensationSignalLevel;
+  freshness: FreshnessSignalLevel;
+  friction: SignalLevel;
+  authenticity: SignalLevel;
+}
+
+export interface CanonicalOpportunityQuality {
+  opportunityLevel: OpportunityLevel;
+  confidence: ConfidenceLevel;
+  signals: OpportunityQualitySignals;
+  evidence: string[]; // reasons/provenance
+}

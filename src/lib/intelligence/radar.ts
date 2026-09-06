@@ -1,10 +1,9 @@
 import type { DiscoveryIntelligenceOutput } from './interfaces.js';
-import type { OpportunityIntelligenceOutput } from './opportunity.js';
 
 export interface RadarJob {
   jobId: string;
   discovery: DiscoveryIntelligenceOutput;
-  opportunity: OpportunityIntelligenceOutput;
+  opportunity: any;
 }
 
 export function generateOpportunityRadar(jobs: RadarJob[]) {

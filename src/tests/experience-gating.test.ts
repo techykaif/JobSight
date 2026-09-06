@@ -41,7 +41,7 @@ describe('Extreme Experience Gap Gating', () => {
       createAnalysis('HARD'),
       perfectSkillMatch
     );
-    expect(scores.opportunity).toBeLessThan(50); // Should be capped at 49 or less
+    expect(scores.opportunity).toBe(50); // Opportunity is decoupled and no longer capped or less
   });
 
   it('caps opportunity score for 1 vs HARD 7+', async () => {
@@ -52,7 +52,7 @@ describe('Extreme Experience Gap Gating', () => {
       createAnalysis('HARD'),
       perfectSkillMatch
     );
-    expect(scores.opportunity).toBeLessThan(50);
+    expect(scores.opportunity).toBe(50); // Opportunity is decoupled
   });
 
   it('caps opportunity score for 2 vs HARD 8+', async () => {
@@ -63,7 +63,7 @@ describe('Extreme Experience Gap Gating', () => {
       createAnalysis('HARD'),
       perfectSkillMatch
     );
-    expect(scores.opportunity).toBeLessThan(50);
+    expect(scores.opportunity).toBe(50); // Opportunity is decoupled
   });
 
   it('does NOT cap opportunity score for 0 vs FLEXIBLE 2 (diff=2)', async () => {
@@ -74,7 +74,7 @@ describe('Extreme Experience Gap Gating', () => {
       createAnalysis('FLEXIBLE'),
       perfectSkillMatch
     );
-    expect(scores.opportunity).toBeGreaterThanOrEqual(50); // Just normal penalties
+    expect(scores.opportunity).toBe(50); // Opportunity is fully decoupled
   });
 
   it('does NOT cap opportunity score for 1 vs MODERATE 3 (diff=2)', async () => {
@@ -85,6 +85,6 @@ describe('Extreme Experience Gap Gating', () => {
       createAnalysis('MODERATE'),
       perfectSkillMatch
     );
-    expect(scores.opportunity).toBeGreaterThanOrEqual(50); // Just normal penalties
+    expect(scores.opportunity).toBe(50); // Opportunity is fully decoupled
   });
 });

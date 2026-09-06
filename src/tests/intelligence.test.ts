@@ -6,7 +6,6 @@ import { CompetitionAnalyzer } from '../lib/intelligence/analyzers/CompetitionAn
 import { FreshnessAnalyzer } from '../lib/intelligence/analyzers/FreshnessAnalyzer.js';
 import { DiscoverySourceAnalyzer } from '../lib/intelligence/analyzers/DiscoverySourceAnalyzer.js';
 import { runDiscoveryIntelligence } from '../lib/intelligence/engine.js';
-import { calculateOpportunityIntelligence } from '../lib/intelligence/opportunity.js';
 import { generateOpportunityRadar } from '../lib/intelligence/radar.js';
 import { detectHiringTrend } from '../lib/intelligence/trends.js';
 import * as repos from '../lib/db/repositories/index.js';
@@ -85,15 +84,6 @@ describe('Discovery Intelligence Engine', () => {
     expect(intelligence.freshness).toBeDefined();
     expect(intelligence.sourceTrust).toBeDefined();
     expect(intelligence.confidence).toBeGreaterThan(0);
-  });
-
-  it('calculates deterministic Opportunity Intelligence', async () => {
-    const intelligence = await runDiscoveryIntelligence(context);
-    const opportunity = calculateOpportunityIntelligence(intelligence);
-    
-    expect(opportunity.opportunityScore).toBeGreaterThanOrEqual(0);
-    expect(opportunity.opportunityScore).toBeLessThanOrEqual(100);
-    expect(['URGENT', 'HIGH', 'NORMAL', 'LOW', 'IGNORE']).toContain(opportunity.priority);
   });
 
   it('generates radar views', () => {

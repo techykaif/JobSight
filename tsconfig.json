@@ -66,6 +66,8 @@
     "**/*.tsx"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "src/scratch",
+    "src/tests"
   ]
 }

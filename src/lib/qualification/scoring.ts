@@ -71,13 +71,9 @@ export async function calculateScores(
 
   // OPPORTUNITY (0-100)
   // Resume Match + Remote Compatibility + Salary Compatibility
-  let oppScore = resScore;
+  let oppScore = 50; // Decoupled from candidate fit
   
-  if (job.remoteType) {
-    if (profile.remotePreference?.includes(job.remoteType)) {
-      oppScore += 10;
-    }
-  }
+  
 
   // Salary Attractiveness
   const desiredMin = config.minimumDesiredSalary || config.salaryMinimum || profile.salaryExpectations?.minimum;
@@ -89,21 +85,12 @@ export async function calculateScores(
     desiredMin, desiredCurrency, desiredPeriod
   );
 
-  if (salaryAttr === 'EXCEPTIONAL') oppScore += 30;
-  else if (salaryAttr === 'HIGH') oppScore += 20;
-  else if (salaryAttr === 'GOOD') oppScore += 10;
-  else if (salaryAttr === 'BELOW_TARGET' || salaryAttr === 'SIGNIFICANTLY_BELOW_TARGET') {
-    oppScore -= 40; // Heavy rank penalty
-  }
+  
 
-  if (analysis?.majorBlockers?.length) {
-    oppScore -= (analysis.majorBlockers.length * 20);
-  }
+  
 
   // Cap scores if there's an extreme experience gap
-  if (extremeExperienceGap) {
-    oppScore = Math.min(oppScore, 49); // Force below CONSIDER threshold
-  }
+  
 
   return {
     resumeMatch: Math.max(0, Math.min(100, Math.round(resScore))),

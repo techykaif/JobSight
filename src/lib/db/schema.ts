@@ -375,6 +375,12 @@ export const marketIntelligence = sqliteTable('market_intelligence', {
 
   opportunityIntelligence: text('opportunity_intelligence_level').notNull(),
 
+  freshnessLevel: text('freshness_level'),
+  compensationLevel: text('compensation_level'),
+  authenticityLevel: text('authenticity_level'),
+  canonicalEvidence: text('canonical_evidence', { mode: 'json' }),
+
+
   ...timestampFields
 });
 

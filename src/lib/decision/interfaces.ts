@@ -1,5 +1,4 @@
 import type { DiscoveryIntelligenceOutput } from '../intelligence/interfaces.js';
-import type { OpportunityIntelligenceOutput } from '../intelligence/opportunity.js';
 import type { DiscoveredJob } from '../discovery/interfaces.js';
 
 export type DecisionType = 'APPLY_NOW' | 'APPLY_THIS_WEEK' | 'MONITOR' | 'WAIT' | 'RESEARCH_MORE' | 'IGNORE';
@@ -10,7 +9,7 @@ export interface DecisionContext {
   job: DiscoveredJob;
   runId: string;
   discovery: DiscoveryIntelligenceOutput;
-  opportunity: OpportunityIntelligenceOutput;
+  opportunity: any;
   // Placedholders for future dependencies
   qualification?: any;
   company?: any;

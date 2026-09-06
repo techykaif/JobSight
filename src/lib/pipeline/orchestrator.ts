@@ -463,7 +463,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
         if (!job || !job.companyId) continue;
 
         const existingScores = await db.select().from(schema.scores)
-          .where(eq(schema.scores.jobId, job.id));
+          .where(and(eq(schema.scores.jobId, job.id), eq(schema.scores.runId, runId)));
         if (existingScores.some(s => s.scoreType === 'COMPANY_SCORE' && s.runId === runId)) {
           continue;
         }
@@ -582,7 +582,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
         }
 
         const context = { job, company, runId };
-        const oppV1Rec = await db.select().from(schema.scores).where(eq(schema.scores.jobId, job.id));
+        const oppV1Rec = await db.select().from(schema.scores).where(and(eq(schema.scores.jobId, job.id), eq(schema.scores.runId, runId)));
         const oppV1 = oppV1Rec.find(s => s.scoreType === 'OPPORTUNITY')?.scoreValue || 50;
 
         try {
@@ -614,91 +614,15 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
 
     await checkPauseOrCancel();
 
-    // COMPETITION INTELLIGENCE
+    
+    // COMPETITION (Legacy - Disconnected in Phase 7.3 Canonical Opportunity Quality)
     if (!skipCompetition) {
       await updateState('RUNNING', 'COMPETITION');
       await emitEvent({ runId, type: 'COMPETITION_STARTED', stage: 'COMPETITION' });
-
-      const runJobs = await db.select({ job: schema.jobs }).from(schema.jobObservations)
-        .innerJoin(schema.jobs, eq(schema.jobObservations.jobId, schema.jobs.id))
-        .where(eq(schema.jobObservations.runId, runId));
-
-      for (const { job } of runJobs) {
-        await checkPauseOrCancel();
-
-        let company = undefined;
-        if (job.companyId) {
-          const compRec = await db.select().from(schema.companies).where(eq(schema.companies.id, job.companyId)).limit(1);
-          company = compRec[0];
-        }
-
-        const evidenceItemsRaw = await db.select().from(schema.evidenceItems)
-          .innerJoin(schema.opportunityEvidence, eq(schema.evidenceItems.opportunityEvidenceId, schema.opportunityEvidence.id))
-          .where(eq(schema.opportunityEvidence.jobId, job.id));
-
-        const foundationEvidence = evidenceItemsRaw.map(row => ({
-          id: row.evidence_items.id,
-          title: row.evidence_items.title,
-          description: row.evidence_items.description || '',
-          observedValue: row.evidence_items.observedValue || '',
-          normalizedValue: row.evidence_items.normalizedValue || '',
-          weight: row.evidence_items.weight || 1,
-          confidence: row.evidence_items.confidence || 50,
-          source: row.evidence_items.source || 'unknown',
-          timestamp: row.evidence_items.timestamp,
-          category: row.evidence_items.category as any,
-          metadata: row.evidence_items.metadata ? (typeof row.evidence_items.metadata === 'string' ? JSON.parse(row.evidence_items.metadata) : row.evidence_items.metadata) : undefined
-        }));
-
-        const foundationSignalsRec = await db.select().from(schema.observableSignals)
-          .where(eq(schema.observableSignals.jobId, job.id));
-
-        const foundationSignals = foundationSignalsRec.map(s => ({
-          type: s.signalType,
-          value: s.observedValue
-        }));
-
-        const foundationConfRec = await db.select().from(schema.confidenceResults)
-          .where(eq(schema.confidenceResults.jobId, job.id)).limit(1);
-        const foundationConfidence = foundationConfRec[0]?.confidenceScore || 50;
-
-        const context = {
-          job,
-          company,
-          runId,
-          foundationEvidence,
-          foundationConfidence,
-          foundationSignals
-        };
-
-        try {
-          const competitionResult = await runCompetitionIntelligence(context);
-          await persistCompetitionIntelligence(competitionResult);
-          await emitEvent({
-            runId,
-            type: 'COMPETITION_COMPLETED',
-            stage: 'COMPETITION',
-            entityType: 'JOB',
-            entityId: job.id,
-            message: `Competition estimated for job ${job.canonicalTitle}: ${competitionResult.result.level}`
-          });
-        } catch (err: any) {
-          if (err.message === 'Mission Cancelled' || err.name === 'AbortError') throw err;
-          await emitEvent({
-            runId,
-            type: 'COMPETITION_FAILED',
-            stage: 'COMPETITION',
-            entityType: 'JOB',
-            entityId: job.id,
-            message: `Competition failed: ${err.message}`
-          });
-        }
-      }
-
+      // Legacy competition module disconnected. Canonical Opportunity Quality handles competition natively.
+      await emitEvent({ runId, type: 'COMPETITION_COMPLETED', stage: 'COMPETITION', message: 'Legacy competition bypassed.' });
       await db.update(schema.runs).set({ lastCheckpoint: 'COMPETITION_COMPLETED' }).where(eq(schema.runs.id, runId));
     }
-
-    await checkPauseOrCancel();
 
     // COMPANY OPPORTUNITY INTELLIGENCE
     if (!skipCompanyOpportunity) {
@@ -808,8 +732,8 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
       // We only process each job once
       const processedJobIds = new Set<string>();
 
-      const { runMarketIntelligence } = await import('../intelligence/market/engine.js');
-      const { saveMarketIntelligence } = await import('./../db/repositories/marketIntelligence.js');
+      const { evaluateCanonicalOpportunityQuality } = await import('../opportunity-quality/engine.js');
+      const { saveCanonicalOpportunityQuality } = await import('../opportunity-quality/repository.js');
 
       for (const row of runJobs) {
         if (processedJobIds.has(row.job.id)) continue;
@@ -827,8 +751,24 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
           if (row.source?.sourceType) context.sourceProviderType = row.source.sourceType;
           if (artifactMap.get(row.job.id)) context.rawContent = artifactMap.get(row.job.id);
 
-          const result = runMarketIntelligence(context);
-          await saveMarketIntelligence(runId, row.job.id, result);
+          const result = evaluateCanonicalOpportunityQuality(context);
+          
+          await saveCanonicalOpportunityQuality(runId, row.job.id, result);
+
+          // Update legacy OPPORTUNITY score for UI compatibility
+          let legacyScore = 50;
+          if (result.opportunityLevel === 'FAVORABLE') legacyScore = 85;
+          else if (result.opportunityLevel === 'NEUTRAL') legacyScore = 65;
+          else if (result.opportunityLevel === 'UNFAVORABLE') legacyScore = 30;
+
+          await db.update(schema.scores)
+            .set({ scoreValue: legacyScore })
+            .where(and(
+              eq(schema.scores.jobId, row.job.id),
+              eq(schema.scores.runId, runId),
+              eq(schema.scores.scoreType, 'OPPORTUNITY')
+            ));
+
 
           await emitEvent({
             runId,
@@ -836,7 +776,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
             stage: 'MARKET_INTELLIGENCE',
             entityType: 'JOB',
             entityId: row.job.id,
-            message: `Market intelligence evaluated: ${result.opportunityIntelligence}`
+            message: `Market intelligence evaluated: ${result.opportunityLevel}`
           });
         } catch (err: any) {
           if (err.message === 'Mission Cancelled' || err.name === 'AbortError') throw err;
@@ -888,7 +828,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
         // get company opp
         let companyOpportunityResult = undefined;
         if (company) {
-          const compOpp = await db.select().from(schema.companyOpportunity).where(eq(schema.companyOpportunity.companyId, company.id)).limit(1);
+          const compOpp = await db.select().from(schema.companyOpportunity).where(and(eq(schema.companyOpportunity.companyId, company.id), eq(schema.companyOpportunity.runId, runId))).limit(1);
           if (compOpp[0]) companyOpportunityResult = compOpp[0];
         }
 
@@ -960,7 +900,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
         // get qualification
         let qualificationScore: number | undefined;
         let qualificationSkills: string[] | undefined; // Not persisted cleanly right now, graceful degradation
-        const qScore = await db.select().from(schema.scores).where(eq(schema.scores.jobId, job.id)).limit(1);
+        const qScore = await db.select().from(schema.scores).where(and(eq(schema.scores.jobId, job.id), eq(schema.scores.runId, runId))).limit(1);
         if (qScore[0]) {
           qualificationScore = qScore[0].scoreValue;
         }
@@ -972,12 +912,12 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
         // get company opp
         let companyOpportunityResult = undefined;
         if (company) {
-          const compOpp = await db.select().from(schema.companyOpportunity).where(eq(schema.companyOpportunity.companyId, company.id)).limit(1);
+          const compOpp = await db.select().from(schema.companyOpportunity).where(and(eq(schema.companyOpportunity.companyId, company.id), eq(schema.companyOpportunity.runId, runId))).limit(1);
           if (compOpp[0]) companyOpportunityResult = compOpp[0];
         }
 
         // get discovery intelligence
-        const disc = await db.select().from(schema.oppDiscoveryResults).where(eq(schema.oppDiscoveryResults.jobId, job.id)).limit(1);
+        const disc = await db.select().from(schema.oppDiscoveryResults).where(and(eq(schema.oppDiscoveryResults.jobId, job.id), eq(schema.oppDiscoveryResults.runId, runId))).limit(1);
         const discoveryIntelligenceOutput = disc[0] ? { result: disc[0] } as any : undefined;
 
         const context: ApplicationIntelligenceContext = {
@@ -1057,8 +997,8 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
       const job = validJobsMap.get(ed.jobId);
 
       // Load intelligence results needed for context
-      const discRec = await db.select().from(schema.oppDiscoveryResults).where(eq(schema.oppDiscoveryResults.jobId, job.id)).limit(1);
-      const discSigs = await db.select().from(schema.oppDiscoverySignals).where(eq(schema.oppDiscoverySignals.jobId, job.id));
+      const discRec = await db.select().from(schema.oppDiscoveryResults).where(and(eq(schema.oppDiscoveryResults.jobId, job.id), eq(schema.oppDiscoveryResults.runId, runId))).limit(1);
+      const discSigs = await db.select().from(schema.oppDiscoverySignals).where(and(eq(schema.oppDiscoverySignals.jobId, job.id), eq(schema.oppDiscoverySignals.runId, runId)));
 
       const mktRec = await db.select()
         .from(schema.marketIntelligence)
@@ -1075,37 +1015,40 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
       };
 
       // Attempt to load DiscoveryIntelligence summary to get authenticity/freshness if needed
-      const discSumRec = await db.select().from(schema.oppDiscoverySummary).where(eq(schema.oppDiscoverySummary.jobId, job.id)).limit(1);
+      const discSumRec = await db.select().from(schema.oppDiscoverySummary).where(and(eq(schema.oppDiscoverySummary.jobId, job.id), eq(schema.oppDiscoverySummary.runId, runId))).limit(1);
       if (discSumRec[0]) {
         discovery.authenticity = discSumRec[0].authenticity;
         discovery.visibility = discSumRec[0].visibility;
         discovery.competition = discSumRec[0].competition;
       }
 
+      
+      // B7 Compatibility Adapter
+      // Maps Canonical Opportunity Quality to legacy B7 numeric score requirements.
       let opportunityScore = 50;
       let priority = 'NORMAL';
       let recommendedAction = 'Consider applying';
 
       if (mktRec[0]) {
-        if (mktRec[0].opportunityIntelligence === 'FAVORABLE') {
+        const canonicalLevel = mktRec[0].opportunityIntelligence;
+        if (canonicalLevel === 'FAVORABLE') {
           opportunityScore = 85;
           priority = 'URGENT';
           recommendedAction = 'Apply immediately (Highly Favorable Market Condition)';
-        } else if (mktRec[0].opportunityIntelligence === 'NEUTRAL') {
+        } else if (canonicalLevel === 'NEUTRAL') {
           opportunityScore = 65;
           priority = 'HIGH';
           recommendedAction = 'Prioritize application (Favorable conditions)';
-        } else if (mktRec[0].opportunityIntelligence === 'UNFAVORABLE') {
+        } else if (canonicalLevel === 'UNFAVORABLE') {
           opportunityScore = 30;
           priority = 'LOW';
           recommendedAction = 'Skip due to unfavorable market condition';
-        } else if (mktRec[0].opportunityIntelligence === 'INSUFFICIENT_EVIDENCE') {
+        } else if (canonicalLevel === 'INSUFFICIENT_EVIDENCE') {
           opportunityScore = 50;
           priority = 'NORMAL';
         }
       }
-
-      const opportunity = {
+const opportunity = {
         opportunityScore,
         priority,
         recommendedAction
