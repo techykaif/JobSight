@@ -23,6 +23,15 @@ export function evaluateGeographicEligibility(
   const loc = (jobLocation || '').toLowerCase();
   const desc = (jobDescription || '').toLowerCase();
   const text = `${loc} ${desc}`;
+  const originalText = `${jobLocation || ''} ${jobDescription || ''}`;
+  const originalLoc = jobLocation || '';
+
+  const isGeoMatch = (name: string, targetText: string, originalTargetText: string, locationText: string) => {
+    if (name === 'us') {
+      return /\bUS\b/.test(originalTargetText) || /\bU\.S\.(?!\w)/i.test(targetText) || /\bus\b/i.test(locationText);
+    }
+    return new RegExp(`\\b${name}\\b`, 'i').test(targetText);
+  };
 
   if (!candidateCountry) {
     return {
@@ -34,7 +43,7 @@ export function evaluateGeographicEligibility(
   }
 
   // Exact word boundary match for candidate country
-  let isCandidateCountryMentioned = new RegExp(`\\b(?:${candidateCountry})\\b`, 'i').test(text);
+  let isCandidateCountryMentioned = isGeoMatch(candidateCountry, text, originalText, loc);
 
   // 3. Region checks & Aliases
   let candidateRegion: string | null = null;
@@ -49,11 +58,11 @@ export function evaluateGeographicEligibility(
 
   // Check aliases (e.g. if candidate is "USA", match "US")
   if (!isCandidateCountryMentioned && candidateAliases.length > 0) {
-     isCandidateCountryMentioned = candidateAliases.some(alias => new RegExp(`\\b${alias}\\b`, 'i').test(text));
+     isCandidateCountryMentioned = candidateAliases.some(alias => isGeoMatch(alias, text, originalText, loc));
   }
 
   if (remoteType === 'ONSITE' || remoteType === 'HYBRID') {
-    if (loc.includes(candidateCountry) || candidateAliases.some(alias => loc.includes(alias))) {
+    if (isGeoMatch(candidateCountry, loc, originalLoc, loc) || candidateAliases.some(alias => isGeoMatch(alias, loc, originalLoc, loc))) {
       return {
         remoteScope: remoteType as 'ONSITE' | 'HYBRID',
         eligibilityStatus: 'ELIGIBLE',
@@ -82,8 +91,14 @@ export function evaluateGeographicEligibility(
 
     // 1. Worldwide check
     if (/worldwide|work from anywhere|anywhere in the world|remote\s*[-–—:]\s*global/i.test(text)) {
-      const exclusionRegex = new RegExp(`(?:except|excluding|not including|outside of)\\s+(?:.*?\\s+)?(?:${candidateCountry}|${candidateAliases.join('|')})`, 'i');
-      if (exclusionRegex.test(text)) {
+      const allNames = [candidateCountry, ...candidateAliases];
+      const exclusionMatched = allNames.some(name => {
+        if (name === 'us') {
+          return /(?:except|excluding|not including|outside of)\s+(?:.*?\s+)?(?:US\b|U\.S\.(?!\w))/.test(originalText) || /(?:except|excluding|not including|outside of)\s+(?:.*?\s+)?us\b/i.test(loc);
+        }
+        return new RegExp(`(?:except|excluding|not including|outside of)\\s+(?:.*?\\s+)?\\b${name}\\b`, 'i').test(text);
+      });
+      if (exclusionMatched) {
         return {
           remoteScope: 'WORLDWIDE',
           eligibilityStatus: 'NOT_ELIGIBLE',
@@ -133,7 +148,7 @@ export function evaluateGeographicEligibility(
     // We only restrict based on `loc` to avoid false positives from `description`
     if (loc && loc.trim() !== 'remote' && loc.trim() !== 'fully remote' && !loc.toLowerCase().includes('worldwide')) {
       const allKnownCountriesAndRegions = Object.values(REGION_MAPPING).flat().concat(Object.keys(REGION_MAPPING));
-      const mentionedGeo = allKnownCountriesAndRegions.find(geo => new RegExp(`\\b${geo}\\b`, 'i').test(loc));
+      const mentionedGeo = allKnownCountriesAndRegions.find(geo => isGeoMatch(geo, loc, originalLoc, loc));
 
       if (mentionedGeo) {
         const isRegion = Object.keys(REGION_MAPPING).includes(mentionedGeo);

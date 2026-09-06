@@ -18,7 +18,7 @@ describe('Phase 3 - UI Provenance and Decision Authority', () => {
     const runId = crypto.randomUUID();
     const configId = crypto.randomUUID();
     await db.insert(schema.huntConfigs).values({ id: configId, targetRoles: [], alternativeRoles: [], createdAt: '', updatedAt: '' });
-    await db.insert(schema.runs).values({ id: runId, configId, status: 'RUNNING', createdAt: '', updatedAt: '' });
+    await db.insert(schema.runs).values({ id: runId, configId, status: 'RUNNING', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
 
     // Step 1: Initial discovery
     const { job } = await persistCandidateJob(runId, {
@@ -63,7 +63,7 @@ describe('Phase 3 - UI Provenance and Decision Authority', () => {
     const runId = crypto.randomUUID();
     const configId = crypto.randomUUID();
     await db.insert(schema.huntConfigs).values({ id: configId, targetRoles: [], alternativeRoles: [], createdAt: '', updatedAt: '' });
-    await db.insert(schema.runs).values({ id: runId, configId, status: 'RUNNING', createdAt: '', updatedAt: '' });
+    await db.insert(schema.runs).values({ id: runId, configId, status: 'RUNNING', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
 
     // Job 1: Final INELIGIBLE + Qual CONSIDER + B7 RESEARCH_MORE
     const j1 = await persistCandidateJob(runId, {
@@ -81,7 +81,6 @@ describe('Phase 3 - UI Provenance and Decision Authority', () => {
       job: { title: 'Legacy Job', url: 'https://legacy.com/job', status: 'ACTIVE' }
     });
     await db.insert(schema.decisions).values({ id: crypto.randomUUID(), runId, jobId: j2.job.id, decision: 'CONSIDER', createdAt: '' });
-    
     // Check JobDetail HTML output
     const job1Details = await JobDetailsPage({ params: Promise.resolve({ id: j1.job.id }) });
     const j1Html = util.inspect(job1Details, { depth: null });

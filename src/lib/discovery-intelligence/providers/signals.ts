@@ -51,7 +51,7 @@ export class AggregatorSourceProvider implements BaseDiscoveryIntelligenceProvid
     if (!context.source) return null;
     
     const isAggregator = context.source.sourceType === 'SEARCH_ENGINE' || 
-                         context.source.sourceType === 'RSS_FEED';
+                         context.source.sourceType === 'RSS';
     
     if (isAggregator) {
       return {
@@ -76,7 +76,9 @@ export class DuplicateDetectionProvider implements BaseDiscoveryIntelligenceProv
 
     let duplicates = 0;
     for (const other of context.similarJobsInRun) {
-      if (other.id !== context.job.id && other.canonicalTitle?.toLowerCase() === title) {
+      if (other.id !== context.job.id && 
+          other.canonicalTitle?.toLowerCase() === title &&
+          other.companyId === context.job.companyId) {
         duplicates++;
       }
     }

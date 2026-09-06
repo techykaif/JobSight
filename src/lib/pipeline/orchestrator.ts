@@ -737,7 +737,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
           foundationSignalsByJob[job.id] = sigs.map(s => ({ type: s.signalType, value: s.observedValue }));
 
           // get comp
-          const comp = await db.select().from(schema.competitionResults).where(eq(schema.competitionResults.jobId, job.id)).limit(1);
+          const comp = await db.select().from(schema.competitionResults).where(and(eq(schema.competitionResults.jobId, job.id), eq(schema.competitionResults.runId, runId))).limit(1);
           if (comp[0]) competitionResultsByJob[job.id] = comp[0];
         }
 
@@ -882,7 +882,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
         const foundationSignals = sigs.map(s => ({ type: s.signalType, value: s.observedValue }));
 
         // get comp
-        const comp = await db.select().from(schema.competitionResults).where(eq(schema.competitionResults.jobId, job.id)).limit(1);
+        const comp = await db.select().from(schema.competitionResults).where(and(eq(schema.competitionResults.jobId, job.id), eq(schema.competitionResults.runId, runId))).limit(1);
         const competitionResult = comp[0] ? comp[0] : undefined;
 
         // get company opp
@@ -966,7 +966,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
         }
 
         // get comp
-        const comp = await db.select().from(schema.competitionResults).where(eq(schema.competitionResults.jobId, job.id)).limit(1);
+        const comp = await db.select().from(schema.competitionResults).where(and(eq(schema.competitionResults.jobId, job.id), eq(schema.competitionResults.runId, runId))).limit(1);
         const competitionResult = comp[0] ? comp[0] : undefined;
 
         // get company opp
