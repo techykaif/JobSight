@@ -45,5 +45,21 @@
   3. **Multiple Sources:** Feasibility checked. The repository only contains one generic aggregator (`SearchEngineProvider`) and specific ATS providers. Additional independent aggregators are not currently available, so multi-source expansion was skipped.
   4. **Applicant Volume / Competition:** Feasibility checked. No existing provider realistically has direct access to applicant volumes (ATS APIs do not expose this publicly). Therefore, competition and applicant volumes remain `UNKNOWN` safely without fabrication.
 
-### Phase 8.4: (Pending Assignment)
+### Phase 8.4: Visibility Intelligence
+- **Status:** DONE
+- **Objective:** Make JobSight's visibility intelligence evidence-backed and semantically honest by bounding what can be legitimately concluded from current observations.
+- **Implementation:**
+  1. Updated `engine.ts` to strictly require `PARTIAL` or `EXACT` cross-reference match strength to grant a `HIGH` visibility signal.
+  2. Weak (`LOW`) cross-reference string matches now correctly yield `UNKNOWN` visibility instead of falsely confirming cross-posting.
+  3. Single-source non-observations cleanly return `UNKNOWN` visibility. Multiple independent observations cannot be implemented since `provider_search_engine` is the sole aggregator implementation.
+  4. Added explicit unit tests verifying visibility degradation and independence rules.
+- **Evidence Semantics:**
+  - `OBSERVED_ON_SOURCE` -> `HIGH` visibility *only* if the match was structured and unambiguous.
+  - `NOT_OBSERVED_ON_CHECKED_SOURCE` -> `UNKNOWN` visibility. A single search failure does not prove an opportunity is "hidden" internet-wide.
+  - Competition remains fully decoupled and `UNKNOWN`.
+- **Validation:** 517/517 tests passed. Typecheck clean. Build clean.
+- **Residual Risks:**
+  - The single available independent search source (`SearchEngineProvider`) acts as a bottleneck. True multi-source checking is impossible until more independent providers (e.g. specialized API aggregators) are added.
+  - Observation timestamps (`observedAt`) are stored but currently not expiring old visibility claims; stale cross-references could falsely represent current distribution.
+- **Next Milestone:** Phase 8.5 (Competition & Applicant Volume Intelligence)
 

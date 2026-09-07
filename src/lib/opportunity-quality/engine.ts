@@ -38,8 +38,13 @@ export function evaluateCanonicalOpportunityQuality(context: OpportunityQualityC
   
   if (context.secondaryEvidence) {
     if (context.secondaryEvidence.status === 'OBSERVED_ON_SOURCE') {
-      visibility = 'HIGH';
-      evidence.push(`High visibility: Independently observed on aggregator/search (${context.secondaryEvidence.targetSource}).`);
+      if (context.secondaryEvidence.matchStrength === 'EXACT' || context.secondaryEvidence.matchStrength === 'PARTIAL') {
+        visibility = 'HIGH';
+        evidence.push(`High visibility: Independently observed on aggregator/search (${context.secondaryEvidence.targetSource}) with strong match.`);
+      } else {
+        visibility = 'UNKNOWN';
+        evidence.push(`Visibility unknown: Weak/ambiguous mention observed on (${context.secondaryEvidence.targetSource}), insufficient to prove definitive cross-posting.`);
+      }
     } else if (context.secondaryEvidence.status === 'NOT_OBSERVED_ON_CHECKED_SOURCE') {
       visibility = 'UNKNOWN';
       evidence.push(`Visibility unknown: Not observed on checked aggregator/search (${context.secondaryEvidence.targetSource}), but true visibility cannot be proven.`);

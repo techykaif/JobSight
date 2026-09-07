@@ -159,4 +159,62 @@ describe('Canonical Opportunity Quality', () => {
     });
   });
 
+  describe('Visibility Evidence Handling', () => {
+    it('ATS discovery + independent positive observation (PARTIAL match) -> HIGH visibility', () => {
+      const result = evaluateCanonicalOpportunityQuality(createBaseContext({
+        secondaryEvidence: {
+          status: 'OBSERVED_ON_SOURCE',
+          targetSource: 'SEARCH_ENGINE',
+          matchStrength: 'PARTIAL'
+        }
+      }));
+      expect(result.signals.visibility).toBe('HIGH');
+    });
+
+    it('ATS discovery + independent weak observation (LOW match) -> UNKNOWN visibility', () => {
+      const result = evaluateCanonicalOpportunityQuality(createBaseContext({
+        secondaryEvidence: {
+          status: 'OBSERVED_ON_SOURCE',
+          targetSource: 'SEARCH_ENGINE',
+          matchStrength: 'LOW'
+        }
+      }));
+      // Weak fuzzy match is insufficient to prove HIGH visibility
+      expect(result.signals.visibility).toBe('UNKNOWN');
+    });
+
+    it('multiple independent non-observations -> UNKNOWN visibility (currently 1 source supported, non-observation -> UNKNOWN)', () => {
+      const result = evaluateCanonicalOpportunityQuality(createBaseContext({
+        secondaryEvidence: {
+          status: 'NOT_OBSERVED_ON_CHECKED_SOURCE',
+          targetSource: 'SEARCH_ENGINE'
+        }
+      }));
+      // Cannot convert one non-observation to LOW visibility
+      expect(result.signals.visibility).toBe('UNKNOWN');
+    });
+
+    it('SearchEngine discovery + same-provider exclusion -> UNKNOWN visibility', () => {
+      const result = evaluateCanonicalOpportunityQuality(createBaseContext({
+        sourceProviderType: 'SEARCH_ENGINE',
+        secondaryEvidence: {
+          status: 'UNKNOWN',
+          targetSource: 'SEARCH_ENGINE',
+          checkQuery: 'SKIPPED_SAME_PROVIDER'
+        }
+      }));
+      expect(result.signals.visibility).toBe('UNKNOWN');
+    });
+
+    it('malformed provider response -> UNKNOWN visibility', () => {
+      const result = evaluateCanonicalOpportunityQuality(createBaseContext({
+        secondaryEvidence: {
+          status: 'UNKNOWN',
+          targetSource: 'SEARCH_ENGINE'
+        }
+      }));
+      expect(result.signals.visibility).toBe('UNKNOWN');
+    });
+  });
+
 });
