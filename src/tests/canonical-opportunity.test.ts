@@ -212,4 +212,116 @@ describe('Canonical Opportunity Quality', () => {
     });
   });
 
+  describe('Phase 8.5.2 Opportunity Quality Contract', () => {
+    it('1. UNKNOWN competition + EXCEPTIONAL compensation -> FAVORABLE', () => {
+      const result = evaluateCanonicalOpportunityQuality(createBaseContext({
+        injectedCompetition: 'UNKNOWN',
+        injectedCompensation: 'EXCEPTIONAL'
+      }));
+      expect(result.opportunityLevel).toBe('FAVORABLE');
+    });
+
+    it('2. UNKNOWN competition + TARGET compensation + NEW freshness -> NOT FAVORABLE (NEUTRAL)', () => {
+      const result = evaluateCanonicalOpportunityQuality(createBaseContext({
+        injectedCompetition: 'UNKNOWN',
+        injectedCompensation: 'TARGET',
+        job: { id: 'test', postingDate: new Date().toISOString() }
+      }));
+      expect(result.opportunityLevel).toBe('NEUTRAL');
+    });
+
+    it('3. UNKNOWN competition + UNKNOWN compensation + NEW freshness -> NOT FAVORABLE (NEUTRAL)', () => {
+      const result = evaluateCanonicalOpportunityQuality(createBaseContext({
+        injectedCompetition: 'UNKNOWN',
+        injectedCompensation: 'UNKNOWN',
+        job: { id: 'test', postingDate: new Date().toISOString() }
+      }));
+      expect(result.opportunityLevel).toBe('NEUTRAL');
+    });
+
+    it('4. LOW competition + otherwise positive/neutral signals -> FAVORABLE', () => {
+      const result = evaluateCanonicalOpportunityQuality(createBaseContext({
+        injectedCompetition: 'LOW',
+        injectedCompensation: 'TARGET'
+      }));
+      expect(result.opportunityLevel).toBe('FAVORABLE');
+    });
+
+    it('5. HIGH competition + otherwise neutral -> UNFAVORABLE', () => {
+      const result = evaluateCanonicalOpportunityQuality(createBaseContext({
+        injectedCompetition: 'HIGH',
+        injectedCompensation: 'TARGET'
+      }));
+      expect(result.opportunityLevel).toBe('UNFAVORABLE');
+    });
+
+    it('6. EXCEPTIONAL compensation + HIGH competition -> UNFAVORABLE', () => {
+      const result = evaluateCanonicalOpportunityQuality(createBaseContext({
+        injectedCompetition: 'HIGH',
+        injectedCompensation: 'EXCEPTIONAL'
+      }));
+      expect(result.opportunityLevel).toBe('UNFAVORABLE');
+    });
+
+    it('7. EXCEPTIONAL compensation + STALE freshness -> UNFAVORABLE', () => {
+      const d = new Date();
+      d.setDate(d.getDate() - 20); // STALE
+      const result = evaluateCanonicalOpportunityQuality(createBaseContext({
+        injectedCompetition: 'UNKNOWN',
+        injectedCompensation: 'EXCEPTIONAL',
+        job: { id: 'test', postingDate: d.toISOString() }
+      }));
+      expect(result.opportunityLevel).toBe('UNFAVORABLE');
+    });
+
+    it('8. NEW + BELOW_TARGET compensation -> UNFAVORABLE', () => {
+      const result = evaluateCanonicalOpportunityQuality(createBaseContext({
+        injectedCompetition: 'UNKNOWN',
+        injectedCompensation: 'BELOW_TARGET',
+        job: { id: 'test', postingDate: new Date().toISOString() }
+      }));
+      expect(result.opportunityLevel).toBe('UNFAVORABLE');
+    });
+
+    it('9. UNKNOWN visibility must NOT become LOW', () => {
+      const result = evaluateCanonicalOpportunityQuality(createBaseContext({
+        injectedVisibility: 'UNKNOWN'
+      }));
+      expect(result.signals.visibility).toBe('UNKNOWN');
+    });
+
+    it('10. Direct ATS discovery must NOT become LOW visibility', () => {
+      const result = evaluateCanonicalOpportunityQuality(createBaseContext({
+        sourceProviderType: 'LEVER',
+        sourceUrl: 'https://jobs.lever.co/test'
+      }));
+      expect(result.signals.visibility).toBe('UNKNOWN');
+    });
+
+    it('11. LOW authenticity must prevent FAVORABLE', () => {
+      const result = evaluateCanonicalOpportunityQuality(createBaseContext({
+        injectedCompetition: 'LOW',
+        sourceProviderType: 'UNKNOWN',
+        sourceUrl: 'http://sketchy.com'
+      }));
+      expect(result.signals.authenticity).toBe('LOW');
+      expect(result.opportunityLevel).toBe('NEUTRAL');
+    });
+
+    it('13. UNKNOWN competition must never be interpreted as LOW competition', () => {
+      const result = evaluateCanonicalOpportunityQuality(createBaseContext({
+        injectedCompetition: 'UNKNOWN'
+      }));
+      expect(result.signals.competition).toBe('UNKNOWN');
+    });
+
+    it('14. Genuinely LOW visibility input establishes FAVORABLE', () => {
+      const result = evaluateCanonicalOpportunityQuality(createBaseContext({
+        injectedVisibility: 'LOW'
+      }));
+      expect(result.signals.visibility).toBe('LOW');
+      expect(result.opportunityLevel).toBe('FAVORABLE');
+    });
+  });
+
 });

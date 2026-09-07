@@ -9,6 +9,8 @@ export interface OpportunityQualityContext {
   similarJobsInRun?: any[];
   secondaryEvidence?: import('../pipeline/secondary-evidence.js').CrossReferenceResult;
   injectedCompetition?: import('./interfaces.js').SignalLevel; // Test injection only
+  injectedCompensation?: import('./interfaces.js').CompensationSignalLevel; // Test injection only
+  injectedVisibility?: import('./interfaces.js').SignalLevel; // Test injection only
 }
 
 export function evaluateCanonicalOpportunityQuality(context: OpportunityQualityContext): CanonicalOpportunityQuality {
@@ -37,7 +39,10 @@ export function evaluateCanonicalOpportunityQuality(context: OpportunityQualityC
     ).length;
   }
   
-  if (context.secondaryEvidence) {
+  if (context.injectedVisibility) {
+    visibility = context.injectedVisibility;
+    evidence.push(`Visibility ${visibility}: Test injection override.`);
+  } else if (context.secondaryEvidence) {
     if (context.secondaryEvidence.status === 'OBSERVED_ON_SOURCE') {
       if (context.secondaryEvidence.matchStrength === 'EXACT' || context.secondaryEvidence.matchStrength === 'PARTIAL') {
         visibility = 'HIGH';
@@ -74,7 +79,12 @@ export function evaluateCanonicalOpportunityQuality(context: OpportunityQualityC
   // 3. Compensation
   // We do not have market-baseline data.
   let compensation: CompensationSignalLevel = 'UNKNOWN';
-  evidence.push('Market compensation quality is UNKNOWN (candidate target fit separated).');
+  if (context.injectedCompensation) {
+    compensation = context.injectedCompensation;
+    evidence.push(`Compensation ${compensation}: Test injection override.`);
+  } else {
+    evidence.push('Market compensation quality is UNKNOWN (candidate target fit separated).');
+  }
 
   // 4. Freshness
   let freshness: FreshnessSignalLevel = 'UNKNOWN';
@@ -132,24 +142,34 @@ export function evaluateCanonicalOpportunityQuality(context: OpportunityQualityC
 
   // Evaluate final OpportunityLevel
   let opportunityLevel: OpportunityLevel = 'NEUTRAL';
-  if (competition === 'HIGH') {
-    opportunityLevel = 'UNFAVORABLE';
-  } else if (competition === 'UNKNOWN') {
-    opportunityLevel = 'INSUFFICIENT_EVIDENCE';
-  } else if (competition === 'LOW') {
-    // LOW visibility + LOW competition => FAVORABLE
-    // HIGH visibility + LOW competition => FAVORABLE
-    // Basically explicitly low competition means FAVORABLE.
-    opportunityLevel = 'FAVORABLE';
-  }
+
+  const hasHardNegative = (competition === 'HIGH') || (freshness === 'STALE') || (compensation === 'BELOW_TARGET');
+  const hasStrongPositive = (competition === 'LOW') || (compensation === 'EXCEPTIONAL') || (visibility === 'LOW');
   
-  // If authenticity is LOW, limit it from being FAVORABLE.
-  if (opportunityLevel === 'FAVORABLE' && authenticity === 'LOW') {
-    opportunityLevel = 'NEUTRAL';
-    evidence.push('Downgraded from FAVORABLE to NEUTRAL due to LOW authenticity.');
+  if (hasHardNegative) {
+    opportunityLevel = 'UNFAVORABLE';
+    evidence.push('Opportunity is UNFAVORABLE due to hard negative veto (HIGH competition, STALE freshness, or BELOW_TARGET compensation).');
+  } else if (hasStrongPositive) {
+    if (authenticity === 'LOW') {
+      opportunityLevel = 'NEUTRAL';
+      evidence.push('Downgraded from FAVORABLE to NEUTRAL due to LOW authenticity.');
+    } else {
+      opportunityLevel = 'FAVORABLE';
+      evidence.push('Opportunity is FAVORABLE due to strong intrinsic positive signal (LOW competition, EXCEPTIONAL compensation, or LOW visibility).');
+    }
+  } else {
+    // Determine between NEUTRAL and INSUFFICIENT_EVIDENCE
+    const hasNeutralAnchors = (compensation === 'TARGET') || (authenticity === 'HIGH' && freshness !== 'UNKNOWN');
+    if (hasNeutralAnchors) {
+      opportunityLevel = 'NEUTRAL';
+      evidence.push('Opportunity is NEUTRAL based on standard acceptable signals.');
+    } else {
+      opportunityLevel = 'INSUFFICIENT_EVIDENCE';
+      evidence.push('INSUFFICIENT_EVIDENCE: Lacks strong positive/negative signals and core dimensions are mostly UNKNOWN.');
+    }
   }
 
-  const confidence: ConfidenceLevel = (competition !== 'UNKNOWN') ? 'HIGH' : 'LOW';
+  const confidence: ConfidenceLevel = (competition !== 'UNKNOWN' || compensation !== 'UNKNOWN' || visibility !== 'UNKNOWN') ? 'HIGH' : 'LOW';
 
   return {
     opportunityLevel,
