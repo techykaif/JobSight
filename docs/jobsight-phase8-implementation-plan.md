@@ -20,6 +20,11 @@
 
 ## Phase 8 Milestones
 
-### Phase 8.1: (Pending Assignment)
+### Phase 8.1: Evidence Acquisition Architecture Audit
+- **Status:** DONE
+- **Artifact:** `docs/jobsight-phase8-1-evidence-acquisition-audit.md`
+- **Verdict:** Evidence acquisition is entirely heuristic/inferred. No pipeline exists for actual applicant volume or genuine aggregator cross-referencing.
+
+### Phase 8.2: (Pending Assignment)
 - **Status:** LEFT
 
