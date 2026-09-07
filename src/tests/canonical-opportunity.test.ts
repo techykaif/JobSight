@@ -42,17 +42,17 @@ describe('Canonical Opportunity Quality', () => {
   });
 
   describe('Visibility & Competition Interactions', () => {
-    it('LOW visibility + LOW competition + sufficient evidence -> FAVORABLE', () => {
+    it('UNKNOWN visibility + LOW competition + sufficient evidence -> FAVORABLE', () => {
       const result = evaluateCanonicalOpportunityQuality(createBaseContext({
         rawContent: 'be among the first 10 applicants'
       }));
-      expect(result.signals.visibility).toBe('LOW'); // Direct careers page
+      expect(result.signals.visibility).toBe('UNKNOWN'); // Direct careers page non-observation
       expect(result.signals.competition).toBe('LOW');
       expect(result.signals.authenticity).toBe('HIGH');
       expect(result.opportunityLevel).toBe('FAVORABLE');
     });
 
-    it('LOW visibility + HIGH competition -> UNFAVORABLE', () => {
+    it('UNKNOWN visibility + HIGH competition -> UNFAVORABLE', () => {
       const result = evaluateCanonicalOpportunityQuality(createBaseContext({
         rawContent: 'over 200 applicants'
       }));
@@ -60,7 +60,7 @@ describe('Canonical Opportunity Quality', () => {
       expect(result.opportunityLevel).toBe('UNFAVORABLE');
     });
 
-    it('LOW visibility + UNKNOWN competition -> INSUFFICIENT_EVIDENCE', () => {
+    it('UNKNOWN visibility + UNKNOWN competition -> INSUFFICIENT_EVIDENCE', () => {
       const result = evaluateCanonicalOpportunityQuality(createBaseContext());
       expect(result.opportunityLevel).toBe('INSUFFICIENT_EVIDENCE');
     });
@@ -148,10 +148,10 @@ describe('Canonical Opportunity Quality', () => {
       const result1 = evaluateCanonicalOpportunityQuality(run1);
       const result2 = evaluateCanonicalOpportunityQuality(run2);
 
-      // Run 1 has no duplicates -> LOW visibility
-      expect(result1.signals.visibility).toBe('LOW');
-      // Run 2 has duplicates -> MEDIUM visibility
-      expect(result2.signals.visibility).toBe('MEDIUM');
+      // Run 1 has no duplicates -> UNKNOWN visibility
+      expect(result1.signals.visibility).toBe('UNKNOWN');
+      // Run 2 has duplicates -> UNKNOWN visibility
+      expect(result2.signals.visibility).toBe('UNKNOWN');
       
       // But intrinsic properties (like competition parsed from text) remain independent but identically evaluated
       expect(result1.signals.competition).toBe('LOW');

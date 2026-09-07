@@ -26,14 +26,15 @@
 - **Verdict:** Evidence acquisition is entirely heuristic/inferred. No pipeline exists for actual applicant volume or genuine aggregator cross-referencing.
 
 ### Phase 8.2: Secondary Evidence Pipeline
-- **Status:** IN PROGRESS
+- **Status:** DONE (Corrected)
 - **Objective:** Implement a cross-reference pipeline that independently verifies a discovered job's presence on other sources (e.g., search engines/aggregators).
 - **Architecture:** 
-  1. Input: `company + title + location + canonical URL`
-  2. Action: Independent verification query.
-  3. Output: `OBSERVED_ON_SOURCE`, `NOT_OBSERVED_ON_CHECKED_SOURCE`, `UNKNOWN`.
-  4. Persistence: New `job_cross_references` table storing exact URL, match strength, and observation timestamp.
-  5. Consumption: Market Intelligence consumes this hard evidence to replace previous visibility/competition heuristics.
+  1. Input: `company + title + location + canonical URL` and `originatingProvider`.
+  2. Guard: If `originatingProvider === 'SEARCH_ENGINE'`, skip independent check.
+  3. Action: Independent verification query.
+  4. Output: `OBSERVED_ON_SOURCE`, `NOT_OBSERVED_ON_CHECKED_SOURCE`, `UNKNOWN`.
+  5. Persistence: `job_cross_references` table storing exact query string (`checkQuery`), exact URL, match strength, and observation timestamp.
+  6. Consumption: Market Intelligence explicitly maps `NOT_OBSERVED_ON_CHECKED_SOURCE` to `UNKNOWN` visibility, preventing unsupported internet-wide "hidden" claims.
 
 ### Phase 8.3: (Pending Assignment)
 - **Status:** LEFT

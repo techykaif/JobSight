@@ -1,0 +1,1 @@
+ALTER TABLE `job_cross_references` ADD `check_query` text;

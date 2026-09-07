@@ -41,13 +41,8 @@ export function evaluateCanonicalOpportunityQuality(context: OpportunityQualityC
       visibility = 'HIGH';
       evidence.push(`High visibility: Independently observed on aggregator/search (${context.secondaryEvidence.targetSource}).`);
     } else if (context.secondaryEvidence.status === 'NOT_OBSERVED_ON_CHECKED_SOURCE') {
-      if (duplicateCount > 0) {
-        visibility = 'MEDIUM';
-        evidence.push(`Medium visibility: Verified absent from checked aggregator, but multiple similar jobs found in run.`);
-      } else {
-        visibility = 'LOW';
-        evidence.push(`Low visibility: Verified absent from checked aggregator/search (${context.secondaryEvidence.targetSource}).`);
-      }
+      visibility = 'UNKNOWN';
+      evidence.push(`Visibility unknown: Not observed on checked aggregator/search (${context.secondaryEvidence.targetSource}), but true visibility cannot be proven.`);
     } else {
       evidence.push('Visibility unknown: Secondary verification failed or returned unknown.');
     }

@@ -10,11 +10,16 @@ export type MatchStrength = 'EXACT' | 'PARTIAL' | 'LOW';
 export interface CrossReferenceResult {
   status: ObservationStatus;
   targetSource: string;
+  checkQuery?: string;
   observedUrl?: string;
   matchStrength?: MatchStrength;
 }
 
-export async function checkSecondaryEvidence(job: DiscoveredJob): Promise<CrossReferenceResult> {
+export async function checkSecondaryEvidence(job: DiscoveredJob, originatingProvider?: string): Promise<CrossReferenceResult> {
+  if (originatingProvider === 'SEARCH_ENGINE') {
+    return { status: 'UNKNOWN', targetSource: 'SEARCH_ENGINE', checkQuery: 'SKIPPED_SAME_PROVIDER' };
+  }
+
   if (!job.companyName || !job.title || !job.location) {
     return { status: 'UNKNOWN', targetSource: 'SEARCH_ENGINE' };
   }
@@ -41,7 +46,7 @@ export async function checkSecondaryEvidence(job: DiscoveredJob): Promise<CrossR
     });
     
     if (!searchResult || !searchResult.unstructuredText) {
-      return { status: 'UNKNOWN', targetSource: 'SEARCH_ENGINE' };
+      return { status: 'UNKNOWN', targetSource: 'SEARCH_ENGINE', checkQuery: query };
     }
 
     const rawLower = searchResult.unstructuredText.toLowerCase();
@@ -55,19 +60,21 @@ export async function checkSecondaryEvidence(job: DiscoveredJob): Promise<CrossR
       return {
         status: 'OBSERVED_ON_SOURCE',
         targetSource: 'SEARCH_ENGINE',
+        checkQuery: query,
         observedUrl: 'https://linkedin.com/jobs/view/derived-from-search', // Simulated extraction
         matchStrength: 'PARTIAL'
       };
     } else {
       return {
         status: 'NOT_OBSERVED_ON_CHECKED_SOURCE',
-        targetSource: 'SEARCH_ENGINE'
+        targetSource: 'SEARCH_ENGINE',
+        checkQuery: query
       };
     }
 
   } catch (err) {
     console.warn(`[Secondary Evidence] Failed to cross-reference job:`, err);
-    return { status: 'UNKNOWN', targetSource: 'SEARCH_ENGINE' };
+    return { status: 'UNKNOWN', targetSource: 'SEARCH_ENGINE', checkQuery: query };
   }
 }
 
@@ -79,6 +86,7 @@ export async function persistSecondaryEvidence(jobId: string, runId: string, res
       runId,
       targetSource: result.targetSource,
       observationStatus: result.status,
+      checkQuery: result.checkQuery || null,
       observedUrl: result.observedUrl || null,
       matchStrength: result.matchStrength || null,
       observedAt: new Date().toISOString(),

@@ -703,6 +703,7 @@ export const jobCrossReferences = sqliteTable('job_cross_references', {
   runId: text('run_id').references(() => runs.id),
   targetSource: text('target_source').notNull(), // e.g. SEARCH_ENGINE, LINKEDIN
   observationStatus: text('observation_status').notNull(), // OBSERVED_ON_SOURCE, NOT_OBSERVED_ON_CHECKED_SOURCE, UNKNOWN
+  checkQuery: text('check_query'),
   observedUrl: text('observed_url'),
   matchStrength: text('match_strength'), // EXACT, PARTIAL, LOW
   observedAt: text('observed_at').notNull(),

@@ -752,7 +752,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
           if (row.source?.sourceType) context.sourceProviderType = row.source.sourceType;
           if (artifactMap.get(row.job.id)) context.rawContent = artifactMap.get(row.job.id);
 
-          const crossRef = await checkSecondaryEvidence(row.job as any);
+          const crossRef = await checkSecondaryEvidence(row.job as any, context.sourceProviderType);
           await persistSecondaryEvidence(row.job.id, runId, crossRef);
           context.secondaryEvidence = crossRef;
 
