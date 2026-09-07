@@ -16,6 +16,7 @@ import { runApplicationIntelligence, persistApplicationIntelligence } from '../a
 import type { ApplicationIntelligenceContext } from '../application-intelligence/interfaces.js';
 import { CandidateProfileSchema, type CandidateProfile } from '../qualification/schema';
 import { checkDiscoveryUrlSafety } from '../discovery/url-safety.js';
+import { checkSecondaryEvidence, persistSecondaryEvidence } from './secondary-evidence.js';
 import crypto from 'crypto';
 export async function runMission(runId: string, abortSignal: AbortSignal, isPauseRequested: () => boolean) {
   let config: any;
@@ -750,6 +751,10 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
           if (row.source?.sourceUrl) context.sourceUrl = row.source.sourceUrl;
           if (row.source?.sourceType) context.sourceProviderType = row.source.sourceType;
           if (artifactMap.get(row.job.id)) context.rawContent = artifactMap.get(row.job.id);
+
+          const crossRef = await checkSecondaryEvidence(row.job as any);
+          await persistSecondaryEvidence(row.job.id, runId, crossRef);
+          context.secondaryEvidence = crossRef;
 
           const result = evaluateCanonicalOpportunityQuality(context);
           

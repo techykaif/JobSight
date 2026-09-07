@@ -7,6 +7,7 @@ export interface OpportunityQualityContext {
   sourceProviderType?: string;
   rawContent?: string;
   similarJobsInRun?: any[];
+  secondaryEvidence?: import('../pipeline/secondary-evidence.js').CrossReferenceResult;
 }
 
 export function evaluateCanonicalOpportunityQuality(context: OpportunityQualityContext): CanonicalOpportunityQuality {
@@ -25,6 +26,7 @@ export function evaluateCanonicalOpportunityQuality(context: OpportunityQualityC
   }
   const mainstreamAggregators = ['linkedin.com', 'indeed.com', 'glassdoor.com', 'ziprecruiter.com'];
   const mainstreamAggregatorPresence = mainstreamAggregators.some(agg => url.includes(agg));
+  
   let duplicateCount = 0;
   if (context.similarJobsInRun && context.job.title) {
     duplicateCount = context.similarJobsInRun.filter(j =>
@@ -33,19 +35,24 @@ export function evaluateCanonicalOpportunityQuality(context: OpportunityQualityC
       j.sourceUrl !== context.job.sourceUrl
     ).length;
   }
-
-  if (mainstreamAggregatorPresence) {
-    visibility = 'HIGH';
-    evidence.push('High visibility: found on mainstream aggregator.');
-  } else if (directSource && duplicateCount === 0) {
-    visibility = 'LOW';
-    evidence.push('Low visibility: direct source with no duplicates.');
-  } else if (directSource && duplicateCount > 0) {
-    visibility = 'MEDIUM';
-    evidence.push('Medium visibility: direct source but multiple similar jobs found.');
-  } else if (provider === 'SEARCH_ENGINE') {
-    visibility = 'MEDIUM';
-    evidence.push('Medium visibility: found via search engine.');
+  
+  if (context.secondaryEvidence) {
+    if (context.secondaryEvidence.status === 'OBSERVED_ON_SOURCE') {
+      visibility = 'HIGH';
+      evidence.push(`High visibility: Independently observed on aggregator/search (${context.secondaryEvidence.targetSource}).`);
+    } else if (context.secondaryEvidence.status === 'NOT_OBSERVED_ON_CHECKED_SOURCE') {
+      if (duplicateCount > 0) {
+        visibility = 'MEDIUM';
+        evidence.push(`Medium visibility: Verified absent from checked aggregator, but multiple similar jobs found in run.`);
+      } else {
+        visibility = 'LOW';
+        evidence.push(`Low visibility: Verified absent from checked aggregator/search (${context.secondaryEvidence.targetSource}).`);
+      }
+    } else {
+      evidence.push('Visibility unknown: Secondary verification failed or returned unknown.');
+    }
+  } else {
+    evidence.push('Visibility unknown: No secondary evidence provided.');
   }
 
   // 2. Competition & Applicant Volume

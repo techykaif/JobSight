@@ -148,6 +148,13 @@
       "when": 1788728750916,
       "tag": "0020_gifted_red_skull",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1788804371358,
+      "tag": "0021_flippant_quasar",
+      "breakpoints": true
     }
   ]
 }

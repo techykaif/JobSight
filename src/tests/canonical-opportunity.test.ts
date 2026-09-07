@@ -9,6 +9,10 @@ describe('Canonical Opportunity Quality', () => {
     sourceProviderType: 'GREENHOUSE',
     sourceUrl: 'https://boards.greenhouse.io/test',
     rawContent: '',
+    secondaryEvidence: {
+      status: 'NOT_OBSERVED_ON_CHECKED_SOURCE',
+      targetSource: 'SEARCH_ENGINE'
+    },
     ...overrides
   });
 

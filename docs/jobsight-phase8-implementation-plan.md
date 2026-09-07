@@ -25,6 +25,16 @@
 - **Artifact:** `docs/jobsight-phase8-1-evidence-acquisition-audit.md`
 - **Verdict:** Evidence acquisition is entirely heuristic/inferred. No pipeline exists for actual applicant volume or genuine aggregator cross-referencing.
 
-### Phase 8.2: (Pending Assignment)
+### Phase 8.2: Secondary Evidence Pipeline
+- **Status:** IN PROGRESS
+- **Objective:** Implement a cross-reference pipeline that independently verifies a discovered job's presence on other sources (e.g., search engines/aggregators).
+- **Architecture:** 
+  1. Input: `company + title + location + canonical URL`
+  2. Action: Independent verification query.
+  3. Output: `OBSERVED_ON_SOURCE`, `NOT_OBSERVED_ON_CHECKED_SOURCE`, `UNKNOWN`.
+  4. Persistence: New `job_cross_references` table storing exact URL, match strength, and observation timestamp.
+  5. Consumption: Market Intelligence consumes this hard evidence to replace previous visibility/competition heuristics.
+
+### Phase 8.3: (Pending Assignment)
 - **Status:** LEFT
 
