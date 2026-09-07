@@ -81,7 +81,7 @@ describe('Canonical Opportunity Quality', () => {
   describe('Freshness', () => {
     it('fresh job -> NEW', () => {
       const result = evaluateCanonicalOpportunityQuality(createBaseContext({
-        job: { firstSeenAt: new Date().toISOString() }
+        job: { id: 'test', postingDate: new Date().toISOString() }
       }));
       expect(result.signals.freshness).toBe('NEW');
     });
@@ -90,7 +90,7 @@ describe('Canonical Opportunity Quality', () => {
       const d = new Date();
       d.setDate(d.getDate() - 10);
       const result = evaluateCanonicalOpportunityQuality(createBaseContext({
-        job: { firstSeenAt: d.toISOString() }
+        job: { id: 'test', postingDate: d.toISOString() }
       }));
       expect(result.signals.freshness).toBe('AGING');
     });
@@ -99,14 +99,14 @@ describe('Canonical Opportunity Quality', () => {
       const d = new Date();
       d.setDate(d.getDate() - 20);
       const result = evaluateCanonicalOpportunityQuality(createBaseContext({
-        job: { firstSeenAt: d.toISOString() }
+        job: { id: 'test', postingDate: d.toISOString() }
       }));
       expect(result.signals.freshness).toBe('STALE');
     });
 
     it('missing timestamp -> UNKNOWN', () => {
       const result = evaluateCanonicalOpportunityQuality(createBaseContext({
-        job: { firstSeenAt: null }
+        job: { id: 'test', postingDate: null }
       }));
       expect(result.signals.freshness).toBe('UNKNOWN');
     });

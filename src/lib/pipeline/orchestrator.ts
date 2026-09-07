@@ -250,6 +250,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
                 if (enriched.location && enriched.location.trim().length > 0) { job.location = enriched.location; }
                 if (enriched.experienceMin !== null && enriched.experienceMin !== undefined) { job.experienceMin = enriched.experienceMin; }
                 if (enriched.experienceMax !== null && enriched.experienceMax !== undefined) { job.experienceMax = enriched.experienceMax; }
+                if (enriched.postingDate && enriched.postingDate.trim().length > 0) { (job as any).postingDate = enriched.postingDate; }
 
                 // Construct structured description for Candidate Fit
                 let currentDesc: any = {};
@@ -290,6 +291,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
                    location: job.location,
                    experienceMin: job.experienceMin,
                    experienceMax: job.experienceMax,
+                   postingDate: job.postingDate,
                    description: JSON.stringify(newDesc),
                    candidateRemoteEligibility: job.candidateRemoteEligibility,
                    geographicRemoteScope: job.geographicRemoteScope,

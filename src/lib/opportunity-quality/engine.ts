@@ -87,22 +87,23 @@ export function evaluateCanonicalOpportunityQuality(context: OpportunityQualityC
 
   // 4. Freshness
   let freshness: FreshnessSignalLevel = 'UNKNOWN';
-  const seenAt = context.job.firstSeenAt;
-  if (seenAt) {
-    const ageMs = Date.now() - new Date(seenAt).getTime();
+  // Use explicitly extracted postingDate. Do NOT infer posting date merely from crawl time (firstSeenAt).
+  const postedAt = (context.job as any).postingDate;
+  if (postedAt) {
+    const ageMs = Date.now() - new Date(postedAt).getTime();
     const ageDays = ageMs / (1000 * 60 * 60 * 24);
     if (ageDays <= 3) {
       freshness = 'NEW';
-      evidence.push('Freshness: NEW (discovered recently).');
+      evidence.push(`Freshness: NEW (structured posting date is ${postedAt}, <= 3 days old).`);
     } else if (ageDays <= 14) {
       freshness = 'AGING';
-      evidence.push('Freshness: AGING (discovered up to 2 weeks ago).');
+      evidence.push(`Freshness: AGING (structured posting date is ${postedAt}, <= 14 days old).`);
     } else {
       freshness = 'STALE';
-      evidence.push('Freshness: STALE (discovered more than 2 weeks ago).');
+      evidence.push(`Freshness: STALE (structured posting date is ${postedAt}, > 14 days old).`);
     }
   } else {
-    evidence.push('Freshness: UNKNOWN (missing reliable timestamp).');
+    evidence.push('Freshness: UNKNOWN (missing reliable structured posting timestamp).');
   }
 
   // 5. Hiring Friction

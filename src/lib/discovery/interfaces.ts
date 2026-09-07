@@ -35,6 +35,7 @@ export interface DiscoveredJob {
   salaryCurrency?: string;
   salaryPeriod?: string;
   description?: string;
+  postingDate?: string;
   rawContent?: string;
 }
 

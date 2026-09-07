@@ -85,3 +85,20 @@ describe('Secondary Evidence Pipeline', () => {
     expect(SearchEngineProvider.prototype.discover).not.toHaveBeenCalled();
   });
 });
+
+describe('Secondary Evidence JSONL parsing', () => {
+  it('extracts URL and PARTIAL strength on structured JSONL match', async () => {
+    const job: any = { companyName: 'Acme', title: 'Eng', location: 'Remote', sourceUrl: 'https://test.com' };
+    vi.mocked(SearchEngineProvider.prototype.discover).mockResolvedValue({
+      jobs: [],
+      unstructuredText: '{"url":"https://linked.com/1","title":"Eng","company":"Acme"}',
+      latencyMs: 10
+    });
+
+    const result = await checkSecondaryEvidence(job, 'GREENHOUSE');
+
+    expect(result.status).toBe('OBSERVED_ON_SOURCE');
+    expect(result.matchStrength).toBe('PARTIAL');
+    expect(result.observedUrl).toBe('https://linked.com/1');
+  });
+});

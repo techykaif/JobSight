@@ -13,7 +13,8 @@ export const HtmlEnrichmentSchema = z.object({
   requiredSkills: z.array(z.string()).nullable().describe("Required skills list"),
   preferredSkills: z.array(z.string()).nullable().describe("Preferred skills list"),
   experienceMin: z.number().nullable().describe("Minimum required years of experience"),
-  experienceMax: z.number().nullable().describe("Maximum allowed years of experience, if stated")
+  experienceMax: z.number().nullable().describe("Maximum allowed years of experience, if stated"),
+  postingDate: z.string().nullable().describe("ISO 8601 posting date if explicitly stated or present in JSON-LD. Null if inferred or missing")
 });
 
 export type HtmlEnrichmentResult = z.infer<typeof HtmlEnrichmentSchema>;
@@ -49,12 +50,13 @@ ${htmlContent.substring(0, 15000)}
           requiredSkills: { type: "array", items: { type: "string" }, nullable: true },
           preferredSkills: { type: "array", items: { type: "string" }, nullable: true },
           experienceMin: { type: "number", nullable: true },
-          experienceMax: { type: "number", nullable: true }
+          experienceMax: { type: "number", nullable: true },
+          postingDate: { type: "string", nullable: true }
         },
         required: [
           "jobDescription", "salaryMin", "salaryMax", "salaryCurrency", "salaryPeriod",
           "remoteType", "location", "employmentType", "requiredSkills", "preferredSkills",
-          "experienceMin", "experienceMax"
+          "experienceMin", "experienceMax", "postingDate"
         ]
       },
       timeoutMs: 60000,

@@ -49,21 +49,57 @@ export async function checkSecondaryEvidence(job: DiscoveredJob, originatingProv
       return { status: 'UNKNOWN', targetSource: 'SEARCH_ENGINE', checkQuery: query };
     }
 
-    const rawLower = searchResult.unstructuredText.toLowerCase();
+    let bestMatchUrl: string | null = null;
+    let matchStrength: MatchStrength = 'LOW';
+    let observed = false;
+
+    const lines = searchResult.unstructuredText.split('\n');
+    for (const line of lines) {
+      if (!line.trim().startsWith('{')) continue;
+      try {
+        const item = JSON.parse(line.trim());
+        if (item.company && item.title && item.url) {
+          const compLower = item.company.toLowerCase();
+          const titleLower = item.title.toLowerCase();
+          const targetComp = job.companyName.toLowerCase();
+          const targetTitle = job.title.toLowerCase();
+          
+          if (compLower.includes(targetComp) || targetComp.includes(compLower)) {
+            if (titleLower.includes(targetTitle) || targetTitle.includes(titleLower)) {
+              observed = true;
+              bestMatchUrl = item.url;
+              matchStrength = 'PARTIAL'; // Strong structured company + title match
+              break;
+            }
+          }
+        }
+      } catch (e) {
+        // Ignore parse errors per line
+      }
+    }
     
-    // Evaluate if the job title and company appear in the search results
-    // In a full implementation, we would extract the actual URLs from the SERP.
-    const companyFound = rawLower.includes(job.companyName.toLowerCase());
-    const titleFound = rawLower.includes(job.title.toLowerCase());
+    if (!observed) {
+      // Fallback to fuzzy text search as a weak signal
+      const rawLower = searchResult.unstructuredText.toLowerCase();
+      const companyFound = rawLower.includes(job.companyName.toLowerCase());
+      const titleFound = rawLower.includes(job.title.toLowerCase());
+      if (companyFound && titleFound) {
+        observed = true;
+        matchStrength = 'LOW'; // Weak ambiguous mention
+      }
+    }
     
-    if (companyFound && titleFound) {
-      return {
+    if (observed) {
+      const result: CrossReferenceResult = {
         status: 'OBSERVED_ON_SOURCE',
         targetSource: 'SEARCH_ENGINE',
         checkQuery: query,
-        observedUrl: 'https://linkedin.com/jobs/view/derived-from-search', // Simulated extraction
-        matchStrength: 'PARTIAL'
+        matchStrength
       };
+      if (bestMatchUrl) {
+        result.observedUrl = bestMatchUrl;
+      }
+      return result;
     } else {
       return {
         status: 'NOT_OBSERVED_ON_CHECKED_SOURCE',

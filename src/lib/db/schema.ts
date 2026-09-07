@@ -98,6 +98,7 @@ export const jobs = sqliteTable('jobs', {
   description: text('description'),
   firstSeenAt: text('first_seen_at').notNull(),
   lastSeenAt: text('last_seen_at').notNull(),
+  postingDate: text('posting_date'),
   status: text('status').notNull(), // ACTIVE, INACTIVE, UNKNOWN
   ...timestampFields
 });
