@@ -8,6 +8,7 @@ export interface OpportunityQualityContext {
   rawContent?: string;
   similarJobsInRun?: any[];
   secondaryEvidence?: import('../pipeline/secondary-evidence.js').CrossReferenceResult;
+  injectedCompetition?: import('./interfaces.js').SignalLevel; // Test injection only
 }
 
 export function evaluateCanonicalOpportunityQuality(context: OpportunityQualityContext): CanonicalOpportunityQuality {
@@ -56,33 +57,18 @@ export function evaluateCanonicalOpportunityQuality(context: OpportunityQualityC
   }
 
   // 2. Competition & Applicant Volume
+  // Phase 8.5 Audit: No available ATS provider (Greenhouse, Lever, Ashby, Workday) natively 
+  // exposes explicit applicant counts or valid competition metadata. 
+  // We do not scrape LinkedIn due to lack of supported path.
+  // We do not infer competition from remote status, job age, or visibility.
   let competition: SignalLevel = 'UNKNOWN';
   let applicantVolume: number | 'UNKNOWN' = 'UNKNOWN';
-  const amongFirstMatch = rawContent.match(/be among the first\s+(\d{1,5})\s+(?:applicants?|candidates?)/i);
-  const overMatch = rawContent.match(/(?:^|\s)over\s+(\d{1,5})\s+(?:applicants?|candidates?)/i);
-  const plusMatch = rawContent.match(/(?:^|\s)(\d{1,5})\+\s+(?:applicants?|candidates?)/i);
-  const exactMatch = rawContent.match(/(?:^|\s)(\d{1,5})\s+(?:applicants?|candidates?)/i);
-
-  let val = 0;
-  if (amongFirstMatch && amongFirstMatch[1]) val = parseInt(amongFirstMatch[1], 10);
-  else if (overMatch && overMatch[1]) val = parseInt(overMatch[1], 10);
-  else if (plusMatch && plusMatch[1]) val = parseInt(plusMatch[1], 10);
-  else if (exactMatch && exactMatch[1]) val = parseInt(exactMatch[1], 10);
-
-  if (val > 0) {
-    applicantVolume = val;
-    if (val > 100) {
-      competition = 'HIGH';
-      evidence.push(`High competition: ${val} applicants observed.`);
-    } else if (val > 30) {
-      competition = 'MEDIUM';
-      evidence.push(`Medium competition: ${val} applicants observed.`);
-    } else {
-      competition = 'LOW';
-      evidence.push(`Low competition: ${val} applicants observed.`);
-    }
+  
+  if (context.injectedCompetition) {
+    competition = context.injectedCompetition;
+    evidence.push(`Competition ${competition}: Test injection override.`);
   } else {
-    evidence.push('Unknown competition: no direct applicant volume found.');
+    evidence.push('Competition unknown: No legitimate source of applicant volume available.');
   }
 
   // 3. Compensation

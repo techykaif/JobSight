@@ -32,7 +32,7 @@ describe('Canonical Opportunity Quality', () => {
       const result = evaluateCanonicalOpportunityQuality(createBaseContext({
         sourceProviderType: 'UNKNOWN',
         sourceUrl: 'http://sketchy-site.com',
-        rawContent: 'be among the first 5 applicants'
+        injectedCompetition: 'LOW'
       }));
       // Competition is LOW, so it WOULD be FAVORABLE.
       // But authenticity is LOW!
@@ -44,7 +44,7 @@ describe('Canonical Opportunity Quality', () => {
   describe('Visibility & Competition Interactions', () => {
     it('UNKNOWN visibility + LOW competition + sufficient evidence -> FAVORABLE', () => {
       const result = evaluateCanonicalOpportunityQuality(createBaseContext({
-        rawContent: 'be among the first 10 applicants'
+        injectedCompetition: 'LOW'
       }));
       expect(result.signals.visibility).toBe('UNKNOWN'); // Direct careers page non-observation
       expect(result.signals.competition).toBe('LOW');
@@ -54,7 +54,7 @@ describe('Canonical Opportunity Quality', () => {
 
     it('UNKNOWN visibility + HIGH competition -> UNFAVORABLE', () => {
       const result = evaluateCanonicalOpportunityQuality(createBaseContext({
-        rawContent: 'over 200 applicants'
+        injectedCompetition: 'HIGH'
       }));
       expect(result.signals.competition).toBe('HIGH');
       expect(result.opportunityLevel).toBe('UNFAVORABLE');
@@ -67,14 +67,9 @@ describe('Canonical Opportunity Quality', () => {
   });
 
   describe('Competition', () => {
-    it('verified low applicant volume -> LOW', () => {
+    it('verified applicant volume parsing is intentionally disabled -> UNKNOWN', () => {
       const result = evaluateCanonicalOpportunityQuality(createBaseContext({ rawContent: '10 applicants' }));
-      expect(result.signals.competition).toBe('LOW');
-    });
-    
-    it('verified high applicant volume -> HIGH', () => {
-      const result = evaluateCanonicalOpportunityQuality(createBaseContext({ rawContent: '500+ applicants' }));
-      expect(result.signals.competition).toBe('HIGH');
+      expect(result.signals.competition).toBe('UNKNOWN');
     });
   });
 
@@ -117,8 +112,8 @@ describe('Canonical Opportunity Quality', () => {
       // The architecture itself proves this since CanonicalOpportunityQuality 
       // does not accept a CandidateProfile object in its context signature.
       // We simulate identical job conditions explicitly.
-      const jobA = createBaseContext({ rawContent: '10 applicants', sourceUrl: 'https://boards.greenhouse.io/test' });
-      const jobB = createBaseContext({ rawContent: '10 applicants', sourceUrl: 'https://boards.greenhouse.io/test' });
+      const jobA = createBaseContext({ injectedCompetition: 'LOW', sourceUrl: 'https://boards.greenhouse.io/test' });
+      const jobB = createBaseContext({ injectedCompetition: 'LOW', sourceUrl: 'https://boards.greenhouse.io/test' });
       
       const resultA = evaluateCanonicalOpportunityQuality(jobA);
       const resultB = evaluateCanonicalOpportunityQuality(jobB);
@@ -131,13 +126,13 @@ describe('Canonical Opportunity Quality', () => {
 
     it('different runs evaluating the same job remain independent in persistence expectations', () => {
       // The context accepts runId explicitly to scope the evaluation boundary.
-      const run1 = createBaseContext({ runId: 'run1', rawContent: '5 applicants', similarJobsInRun: [] });
+      const run1 = createBaseContext({ runId: 'run1', injectedCompetition: 'LOW', similarJobsInRun: [] });
       
       // In a different run, the same job might be discovered with different surrounding data
       // e.g. duplicates discovered within the same run affect visibility.
       const run2 = createBaseContext({ 
         runId: 'run2', 
-        rawContent: '5 applicants', 
+        injectedCompetition: 'LOW', 
         similarJobsInRun: [{ title: 'test', companyName: 'TestCo', sourceUrl: 'duplicate' }] // Duplicate present in run 2
       });
 

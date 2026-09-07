@@ -61,5 +61,19 @@
 - **Residual Risks:**
   - The single available independent search source (`SearchEngineProvider`) acts as a bottleneck. True multi-source checking is impossible until more independent providers (e.g. specialized API aggregators) are added.
   - Observation timestamps (`observedAt`) are stored but currently not expiring old visibility claims; stale cross-references could falsely represent current distribution.
-- **Next Milestone:** Phase 8.5 (Competition & Applicant Volume Intelligence)
+### Phase 8.5: Competition & Applicant Volume Intelligence
+- **Status:** DONE
+- **Objective:** Determine whether JobSight can legitimately acquire competition/applicant evidence and, if so, implement the smallest reliable path without fabricating scores.
+- **Audit Findings:**
+  1. No current ATS provider (Greenhouse, Lever, Ashby, Workday) exposes applicant counts publicly.
+  2. Generic aggregator outputs (SearchEngineProvider) cannot reliably expose accurate applicant volumes.
+  3. Speculative heuristics (e.g., mapping `Remote` -> `High Competition`, or `Old Job` -> `Low Competition`) fundamentally violate the strict Phase 8 evidence requirements.
+- **Implementation (Option C - No Reliable Source Exists):**
+  1. Ripped out speculative regex text-parsing in `engine.ts` which improperly assumed ATS HTML contained applicant counts.
+  2. Disabled `CompetitionAnalyzer` heuristic scoring logic and rewrote tests to mandate `UNKNOWN` output for competition bounds.
+  3. Ensured `applicantVolume` and `competition` default to `UNKNOWN` safely across the board.
+  4. Verified that `UNKNOWN` correctly passes through the Canonical Opportunity Quality system, yielding `INSUFFICIENT_EVIDENCE` where competition dependencies exist, completely preventing fabricated FAVORABLE claims.
+- **Residual Risks:**
+  - Downstream scoring systems will now cleanly receive `UNKNOWN` competition. Without verified competition signals, fewer opportunities will achieve `FAVORABLE` status organically, accurately reflecting the strict evidence bounds but potentially yielding lower volume.
+- **Next Milestone:** Phase 8.6 (Candidate Fit Independence)
 
