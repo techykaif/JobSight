@@ -119,6 +119,9 @@ ${chunk}
         });
         chunkLatencies.push(Date.now() - start);
         return res;
+      } catch (err: any) {
+        console.warn(`[STRUCTURE] Chunk extraction failed: ${err.message}. Returning zero candidates for this chunk.`);
+        return { candidates: [] };
       } finally {
         activeAgyProcesses--;
         chunksCompleted++;
