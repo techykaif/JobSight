@@ -105,6 +105,37 @@
   5. Employer marketing claims ("top of market") are subjective and insufficient as objective evidence.
 - **Conclusion:** Compensation classification (`EXCEPTIONAL`, `TARGET`, `BELOW_TARGET`) correctly remains `UNKNOWN` in production. No new salary extraction architecture or production implementation is required at this time.
 
+### Phase 8.7: Visibility Evidence Feasibility
+- **Status:** BLOCKED / EXTERNAL DEPENDENCY
+- **Objective:** Evaluate the feasibility of expanding secondary aggregators to establish legitimate `LOW` visibility.
+- **Findings:** JobSight currently has only one independent secondary aggregator (`SearchEngineProvider`). At least two additional genuinely independent secondary providers require external partner/API access that is not currently available.
+- **Decision:** Do not implement `LOW` visibility until the N>=3 evidence quorum can be legitimately satisfied. Visibility must remain `UNKNOWN` when evidence is insufficient.
+
+### Phase 8.8: Mission Evidence Bottleneck Audit
+- **Status:** DONE
+- **Objective:** Trace all evidence dimensions to identify unused/underused evidence and the highest-value remaining bottleneck.
+- **Findings:** The evaluation architecture is flawless but completely starved of intrinsic positive signals. No unused internal evidence exists that can independently establish intrinsic Opportunity Quality without an external baseline.
+- **Decision:** EVIDENCE GAP — NO TRUSTWORTHY PATH CURRENTLY EXISTS.
+
+### External Evidence Requirements
+Phase 8 development on capability expansion is paused until the following external data requirements are secured:
+
+**VISIBILITY:**
+- At least 2 additional genuinely independent secondary aggregators beyond `SearchEngineProvider`.
+- Legitimate programmatic/query access required.
+- Successful zero-result searches must be distinguishable from failures.
+- Fresh, timestamped observations required.
+- N>=3 independent-provider quorum remains mandatory.
+
+**COMPETITION:**
+- Legitimate applicant/application-volume or documented competition evidence required.
+- No inference from visibility, job age, company size, title, remote status, or LLM knowledge.
+
+**COMPENSATION:**
+- Legitimate structured market benchmark required.
+- Candidate salary expectations must remain candidate-specific.
+- LLM pretrained knowledge must not be used as a market baseline.
+
 - **Current Mission Status:** NOT VALIDATED
-- **Next Milestone:** Phase 8.7 (To Be Determined)
+- **Next Milestone:** PAUSED (Awaiting External Dependencies)
 
