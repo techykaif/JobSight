@@ -1,4 +1,4 @@
-import type { CanonicalOpportunityQuality, OpportunityQualitySignals, SignalLevel, FreshnessSignalLevel, CompensationSignalLevel, OpportunityLevel, ConfidenceLevel } from './interfaces.js';
+import type { CanonicalOpportunityQuality, OpportunityQualitySignals, SignalLevel, FreshnessSignalLevel, CompensationSignalLevel, OpportunityLevel, ConfidenceLevel, VisibilitySignalLevel } from './interfaces.js';
 
 export interface OpportunityQualityContext {
   job: any;
@@ -10,7 +10,7 @@ export interface OpportunityQualityContext {
   secondaryEvidence?: import('../pipeline/secondary-evidence.js').CrossReferenceResult;
   injectedCompetition?: import('./interfaces.js').SignalLevel; // Test injection only
   injectedCompensation?: import('./interfaces.js').CompensationSignalLevel; // Test injection only
-  injectedVisibility?: import('./interfaces.js').SignalLevel; // Test injection only
+  injectedVisibility?: import('./interfaces.js').VisibilitySignalLevel; // Test injection only
 }
 
 export function evaluateCanonicalOpportunityQuality(context: OpportunityQualityContext): CanonicalOpportunityQuality {
@@ -21,7 +21,7 @@ export function evaluateCanonicalOpportunityQuality(context: OpportunityQualityC
   const evidence: string[] = [];
 
   // 1. Visibility
-  let visibility: SignalLevel = 'UNKNOWN';
+  let visibility: VisibilitySignalLevel = 'UNKNOWN';
   const directProviders = ['CAREERS_PAGE', 'GREENHOUSE', 'LEVER', 'ASHBY', 'WORKDAY'];
   let directSource = directProviders.includes(provider);
   if (url.includes('jobs.lever.co') || url.includes('boards.greenhouse.io') || url.includes('jobs.ashbyhq.com') || url.includes('myworkdayjobs.com')) {
@@ -51,9 +51,9 @@ export function evaluateCanonicalOpportunityQuality(context: OpportunityQualityC
         visibility = 'UNKNOWN';
         evidence.push(`Visibility unknown: Weak/ambiguous mention observed on (${context.secondaryEvidence.targetSource}), insufficient to prove definitive cross-posting.`);
       }
-    } else if (context.secondaryEvidence.status === 'NOT_OBSERVED_ON_CHECKED_SOURCE') {
-      visibility = 'UNKNOWN';
-      evidence.push(`Visibility unknown: Not observed on checked aggregator/search (${context.secondaryEvidence.targetSource}), but true visibility cannot be proven.`);
+    } else if (context.secondaryEvidence.status === 'NOT_OBSERVED_ON_CHECKED_SOURCES') {
+      visibility = 'NOT_OBSERVED_ON_CHECKED_SOURCES';
+      evidence.push(`Visibility bounded observation: Not observed across checked aggregator/search (${context.secondaryEvidence.targetSource}). True internet-wide visibility remains unproven.`);
     } else {
       evidence.push('Visibility unknown: Secondary verification failed or returned unknown.');
     }

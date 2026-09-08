@@ -35,9 +35,10 @@ export default async function DiscoveryRadarPage() {
       candidateRemoteEligibility: schema.jobs.candidateRemoteEligibility,
     })
     .from(schema.jobs)
-    .innerJoin(schema.discoveryIntelligence, eq(schema.jobs.id, schema.discoveryIntelligence.jobId))
+    .innerJoin(schema.marketIntelligence, eq(schema.jobs.id, schema.marketIntelligence.jobId))
     .leftJoin(schema.companies, eq(schema.jobs.companyId, schema.companies.id))
-    .where(eq(schema.discoveryIntelligence.hiddenGem, true))
+    .where(eq(schema.marketIntelligence.opportunityIntelligence, 'FAVORABLE'))
+    .orderBy(desc(schema.marketIntelligence.createdAt))
     .limit(6);
 
   // 2. Highest Compensation
@@ -77,6 +78,7 @@ export default async function DiscoveryRadarPage() {
     .innerJoin(schema.companyAnalysis, eq(schema.jobs.companyId, schema.companyAnalysis.companyId))
     .leftJoin(schema.companies, eq(schema.jobs.companyId, schema.companies.id))
     .where(eq(schema.companyAnalysis.growthSignal, 'HIGH'))
+    .orderBy(desc(schema.companyAnalysis.researchTimestamp))
     .limit(6);
 
   // 4. Global Remote
@@ -96,6 +98,7 @@ export default async function DiscoveryRadarPage() {
     .from(schema.jobs)
     .leftJoin(schema.companies, eq(schema.jobs.companyId, schema.companies.id))
     .where(or(like(schema.jobs.remoteType, '%REMOTE%'), like(schema.jobs.candidateRemoteEligibility, '%ELIGIBLE%')))
+    .orderBy(desc(schema.jobs.firstSeenAt))
     .limit(6);
 
   // 5. India
@@ -115,6 +118,7 @@ export default async function DiscoveryRadarPage() {
     .from(schema.jobs)
     .leftJoin(schema.companies, eq(schema.jobs.companyId, schema.companies.id))
     .where(like(schema.jobs.location, '%India%'))
+    .orderBy(desc(schema.jobs.firstSeenAt))
     .limit(6);
 
   // 6. AI Companies
@@ -163,6 +167,7 @@ export default async function DiscoveryRadarPage() {
       like(schema.jobs.description, '%machine learning%'),
       like(schema.jobs.description, '%deep learning%'),
     ))
+    .orderBy(desc(schema.jobs.firstSeenAt))
     .limit(6);
 
   // 7. Fast Hiring
@@ -183,6 +188,7 @@ export default async function DiscoveryRadarPage() {
     .innerJoin(schema.companyAnalysis, eq(schema.jobs.companyId, schema.companyAnalysis.companyId))
     .leftJoin(schema.companies, eq(schema.jobs.companyId, schema.companies.id))
     .where(eq(schema.companyAnalysis.hiringMomentum, 'HIGH'))
+    .orderBy(desc(schema.companyAnalysis.researchTimestamp))
     .limit(6);
 
   // 8. Highest Opportunity
@@ -198,16 +204,16 @@ export default async function DiscoveryRadarPage() {
       companyName: schema.companies.displayName,
       companyId: schema.jobs.companyId,
       candidateRemoteEligibility: schema.jobs.candidateRemoteEligibility,
-      opportunityScore: schema.opportunityIntelligence.opportunityScore,
+      opportunityScore: schema.marketIntelligence.opportunityIntelligence,
     })
     .from(schema.jobs)
-    .innerJoin(schema.opportunityIntelligence, eq(schema.jobs.id, schema.opportunityIntelligence.jobId))
+    .innerJoin(schema.marketIntelligence, eq(schema.jobs.id, schema.marketIntelligence.jobId))
     .leftJoin(schema.companies, eq(schema.jobs.companyId, schema.companies.id))
-    .orderBy(desc(schema.opportunityIntelligence.opportunityScore))
+    .orderBy(desc(schema.marketIntelligence.competitionLevel))
     .limit(6);
 
   const sections = [
-    { title: 'Hidden Gems', emoji: '💎', data: hiddenGems, emptyMsg: 'The AI is still scanning the depths for hidden opportunities.', emptyIcon: '🔭' },
+    { title: 'Favorable Opportunities', emoji: '💎', data: hiddenGems, emptyMsg: 'The AI is still scanning the depths for hidden opportunities.', emptyIcon: '🔭' },
     { title: 'Highest Compensation', emoji: '💰', data: highestComp, emptyMsg: 'Awaiting salary data to surface the best-paying roles.', emptyIcon: '💸' },
     { title: 'Fast Growing Companies', emoji: '📈', data: fastGrowing, emptyMsg: 'No hyper-growth signals detected yet.', emptyIcon: '🚀' },
     { title: 'Global Remote', emoji: '🌍', data: globalRemote, emptyMsg: 'No global remote opportunities found right now.', emptyIcon: '🌐' },
@@ -243,14 +249,14 @@ export default async function DiscoveryRadarPage() {
   const competitionRows: (typeof schema.competitionResults.$inferSelect)[] = [];
   const applicationRows: (typeof schema.applicationResults.$inferSelect)[] = [];
   const decisionResultRows: (typeof schema.decisionResults.$inferSelect)[] = [];
-  const discoveryRows: (typeof schema.discoveryIntelligence.$inferSelect)[] = [];
+  const discoveryRows: (typeof schema.marketIntelligence.$inferSelect)[] = [];
 
   for (const idChunk of chunk(jobIds)) {
     if (idChunk.length === 0) continue;
     competitionRows.push(...await db.select().from(schema.competitionResults).where(inArray(schema.competitionResults.jobId, idChunk)));
     applicationRows.push(...await db.select().from(schema.applicationResults).where(inArray(schema.applicationResults.jobId, idChunk)));
     decisionResultRows.push(...await db.select().from(schema.decisionResults).where(inArray(schema.decisionResults.jobId, idChunk)));
-    discoveryRows.push(...await db.select().from(schema.discoveryIntelligence).where(inArray(schema.discoveryIntelligence.jobId, idChunk)));
+    discoveryRows.push(...await db.select().from(schema.marketIntelligence).where(inArray(schema.marketIntelligence.jobId, idChunk)));
   }
 
   const companyOpportunityRows: (typeof schema.companyOpportunity.$inferSelect)[] = [];
@@ -305,7 +311,7 @@ export default async function DiscoveryRadarPage() {
           {section.data.length > 0 ? (
             <div className={styles.grid}>
               {section.data.map(job => {
-                const comp = competitionByJobId.get(job.id)?.level || discoveryByJobId.get(job.id)?.competition;
+                const comp = competitionByJobId.get(job.id)?.level || discoveryByJobId.get(job.id)?.competitionLevel;
                 const readiness = applicationByJobId.get(job.id)?.readinessLevel;
                 const companyOpp = companyOpportunityByCompanyId.get(job.companyId!)?.level;
                 const confidence = decisionConfidenceByJobId.get(job.id)?.confidence;

@@ -16,6 +16,7 @@ export interface JobCardProps {
   salaryMax?: number | undefined;
   remote?: boolean | undefined;
   score?: number | undefined;
+  opportunityQuality?: string | undefined;
   competition?: string | undefined;
   provider?: string | undefined;
   age?: string | undefined;
@@ -46,23 +47,24 @@ const decisionLabel = (d: string): string => {
   if (d === 'REVIEW') return 'Review';
   if (d === 'INELIGIBLE') return 'Ineligible';
   if (d === 'INSUFFICIENT_EVIDENCE') return 'Unknown Fit';
-  if (d === 'RESEARCH_REQUIRED') return 'Research';
+  if (d === 'RESEARCH_REQUIRED') return 'Research Needed';
   return d.replace(/_/g, ' ');
 };
 
-const competitionVariant = (c: string): 'success' | 'warning' | 'danger' | 'neutral' => {
-  const normalized = c.trim().toLowerCase();
-  if (normalized === 'low' || normalized === 'very low') return 'success';
-  if (normalized === 'medium') return 'warning';
-  if (normalized === 'high' || normalized === 'very high') return 'danger';
+const readinessVariant = (l: string): 'success' | 'warning' | 'danger' | 'info' | 'neutral' => {
+  const lower = l.toLowerCase();
+  if (lower.includes('ready now')) return 'success';
+  if (lower.includes('almost ready')) return 'info';
+  if (lower.includes('needs improvement')) return 'warning';
+  if (lower.includes('not recommended')) return 'danger';
   return 'neutral';
 };
 
-const readinessVariant = (r: string): 'success' | 'info' | 'warning' | 'danger' | 'neutral' => {
-  if (r === 'Ready Now') return 'success';
-  if (r === 'Almost Ready') return 'info';
-  if (r === 'Needs Improvement') return 'warning';
-  if (r === 'Not Recommended') return 'danger';
+const competitionVariant = (l: string): 'success' | 'warning' | 'danger' | 'neutral' => {
+  const lower = l.toLowerCase();
+  if (lower.includes('low') && !lower.includes('medium')) return 'success';
+  if (lower.includes('medium')) return 'warning';
+  if (lower.includes('high')) return 'danger';
   return 'neutral';
 };
 
@@ -72,6 +74,14 @@ const companyOpportunityVariant = (l: string): 'success' | 'info' | 'warning' | 
   if (lower.includes('good')) return 'info';
   if (lower.includes('average')) return 'warning';
   if (lower.includes('weak')) return 'danger';
+  return 'neutral';
+};
+
+const opportunityQualityVariant = (l: string): 'success' | 'warning' | 'danger' | 'neutral' => {
+  const upper = l.toUpperCase();
+  if (upper === 'FAVORABLE') return 'success';
+  if (upper === 'NEUTRAL') return 'warning';
+  if (upper === 'UNFAVORABLE') return 'danger';
   return 'neutral';
 };
 
@@ -112,7 +122,7 @@ const ScoreGauge: React.FC<{ score: number }> = ({ score }) => {
 };
 
 export const JobCard: React.FC<JobCardProps> = ({
-  id, title, company, salaryMin, salaryMax, remote, score, competition, provider, age, decision, primaryReason,
+  id, title, company, salaryMin, salaryMax, remote, score, opportunityQuality, competition, provider, age, decision, primaryReason,
   readiness, companyOpportunity, confidence, eligibility, hideDecisionBadge = false, onClick, className = '',
 }) => {
   const router = useRouter();
@@ -133,7 +143,19 @@ export const JobCard: React.FC<JobCardProps> = ({
             {company}
           </span>
         </div>
-        {score !== undefined && <div onClick={stop} style={{ flexShrink: 0 }}><Link href={`/jobs?minScore=${score}`} style={{ textDecoration: 'none', display: 'inline-flex' }}><ScoreGauge score={score} /></Link></div>}
+        {opportunityQuality !== undefined ? (
+          <div onClick={stop} style={{ flexShrink: 0 }}>
+            <Link href={`/jobs/${id}`} style={{ textDecoration: 'none' }}>
+              <StatusBadge status={opportunityQuality.replace(/_/g, ' ')} variant={opportunityQualityVariant(opportunityQuality)} />
+            </Link>
+          </div>
+        ) : score !== undefined ? (
+          <div onClick={stop} style={{ flexShrink: 0 }}>
+            <Link href={`/jobs?minScore=${score}`} style={{ textDecoration: 'none', display: 'inline-flex' }}>
+              <ScoreGauge score={score} />
+            </Link>
+          </div>
+        ) : null}
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>

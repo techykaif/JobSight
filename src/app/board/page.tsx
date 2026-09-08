@@ -46,8 +46,8 @@ export default async function DecisionBoardPage() {
       firstSeenAt: schema.jobs.firstSeenAt,
       decision: schema.decisions.decision,
       finalDecision: schema.candidateDecisions.finalDecision,
-      opportunityScore: schema.opportunityIntelligence.opportunityScore,
-      competition: schema.discoveryIntelligence.competition,
+      opportunityQuality: schema.marketIntelligence.opportunityIntelligence,
+      competition: schema.marketIntelligence.competitionLevel,
       sourceType: schema.jobSources.sourceType
     })
     .from(schema.jobObservations)
@@ -56,8 +56,7 @@ export default async function DecisionBoardPage() {
     .leftJoin(schema.companies, eq(schema.jobs.companyId, schema.companies.id))
     .leftJoin(schema.decisions, and(eq(schema.jobs.id, schema.decisions.jobId), eq(schema.decisions.runId, latestRun.id)))
     .leftJoin(schema.candidateDecisions, and(eq(schema.jobs.id, schema.candidateDecisions.jobId), eq(schema.candidateDecisions.runId, latestRun.id)))
-    .leftJoin(schema.opportunityIntelligence, and(eq(schema.jobs.id, schema.opportunityIntelligence.jobId), eq(schema.opportunityIntelligence.runId, latestRun.id)))
-    .leftJoin(schema.discoveryIntelligence, and(eq(schema.jobs.id, schema.discoveryIntelligence.jobId), eq(schema.discoveryIntelligence.runId, latestRun.id)))
+    .leftJoin(schema.marketIntelligence, and(eq(schema.jobs.id, schema.marketIntelligence.jobId), eq(schema.marketIntelligence.runId, latestRun.id)))
     .leftJoin(schema.jobSources, eq(schema.jobs.id, schema.jobSources.jobId))
     .orderBy(desc(schema.jobs.firstSeenAt));
 
@@ -79,14 +78,14 @@ export default async function DecisionBoardPage() {
   const decisionResultRows: (typeof schema.decisionResults.$inferSelect)[] = [];
   for (const idChunk of chunk(jobIds)) {
     if (idChunk.length === 0) continue;
-    competitionRows.push(...await db.select().from(schema.competitionResults).where(inArray(schema.competitionResults.jobId, idChunk)));
-    applicationRows.push(...await db.select().from(schema.applicationResults).where(inArray(schema.applicationResults.jobId, idChunk)));
-    decisionResultRows.push(...await db.select().from(schema.decisionResults).where(inArray(schema.decisionResults.jobId, idChunk)));
+    competitionRows.push(...await db.select().from(schema.competitionResults).where(and(inArray(schema.competitionResults.jobId, idChunk), eq(schema.competitionResults.runId, latestRun.id))));
+    applicationRows.push(...await db.select().from(schema.applicationResults).where(and(inArray(schema.applicationResults.jobId, idChunk), eq(schema.applicationResults.runId, latestRun.id))));
+    decisionResultRows.push(...await db.select().from(schema.decisionResults).where(and(inArray(schema.decisionResults.jobId, idChunk), eq(schema.decisionResults.runId, latestRun.id))));
   }
   const companyOpportunityRows: (typeof schema.companyOpportunity.$inferSelect)[] = [];
   for (const idChunk of chunk(companyIds)) {
     if (idChunk.length === 0) continue;
-    companyOpportunityRows.push(...await db.select().from(schema.companyOpportunity).where(inArray(schema.companyOpportunity.companyId, idChunk)));
+    companyOpportunityRows.push(...await db.select().from(schema.companyOpportunity).where(and(inArray(schema.companyOpportunity.companyId, idChunk), eq(schema.companyOpportunity.runId, latestRun.id))));
   }
 
   const competitionByJobId = latestByKey(competitionRows, r => r.jobId);
@@ -151,7 +150,7 @@ export default async function DecisionBoardPage() {
                         salaryMin={job.salaryMin ?? undefined}
                         salaryMax={job.salaryMax ?? undefined}
                         remote={job.remoteType === 'REMOTE' || job.remoteType === 'FULLY_REMOTE'}
-                        score={job.opportunityScore ?? undefined}
+                        opportunityQuality={job.opportunityQuality ?? undefined}
                         competition={competitionResult?.level ?? job.competition ?? undefined}
                         readiness={applicationResult?.readinessLevel}
                         companyOpportunity={companyOpportunityResult?.level}

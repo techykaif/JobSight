@@ -141,24 +141,28 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   const coOpportunityRec = await db.select()
     .from(schema.companyOpportunity)
     .where(eq(schema.companyOpportunity.companyId, comp.id))
+    .orderBy(desc(schema.companyOpportunity.createdAt))
     .limit(1);
   const coOpportunity = coOpportunityRec[0] ?? null;
 
   const coSummaryRec = await db.select()
     .from(schema.companySummary)
     .where(eq(schema.companySummary.companyId, comp.id))
+    .orderBy(desc(schema.companySummary.createdAt))
     .limit(1);
   const coSummary = coSummaryRec[0] ?? null;
 
   const coOutlookRec = await db.select()
     .from(schema.companyOutlook)
     .where(eq(schema.companyOutlook.companyId, comp.id))
+    .orderBy(desc(schema.companyOutlook.createdAt))
     .limit(1);
   const coOutlook = coOutlookRec[0] ?? null;
 
   const coSignalsRec = await db.select()
     .from(schema.companySignals)
-    .where(eq(schema.companySignals.companyId, comp.id));
+    .where(eq(schema.companySignals.companyId, comp.id))
+    .orderBy(desc(schema.companySignals.createdAt));
   const coSignals = coSignalsRec;
 
   // ── Parse research artifact ─────────────────────────────────────────────────

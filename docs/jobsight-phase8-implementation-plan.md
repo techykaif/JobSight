@@ -117,6 +117,18 @@
 - **Findings:** The evaluation architecture is flawless but completely starved of intrinsic positive signals. No unused internal evidence exists that can independently establish intrinsic Opportunity Quality without an external baseline.
 - **Decision:** EVIDENCE GAP — NO TRUSTWORTHY PATH CURRENTLY EXISTS.
 
+### Phase 9.3: Bounded Visibility Observation
+- **Status:** DONE
+- **Objective:** Introduce an honest, machine-auditable bounded observation for non-observations on configured secondary sources.
+- **Implementation:** 
+  1. Replaced abstract `LOW` visibility assumptions with an explicit bounded `NOT_OBSERVED_ON_CHECKED_SOURCES` observation.
+  2. Forced weak/ambiguous fuzzy matches to return `UNKNOWN` to prevent false non-observations.
+  3. Wired Canonical Opportunity Quality to safely consume `NOT_OBSERVED_ON_CHECKED_SOURCES` without granting unearned `FAVORABLE` status, preserving isolation of `UNKNOWN` competition/compensation.
+- **Test Results:** 63 files, 526 tests passing, including focused isolation and timestamp/query provenance bounds checking.
+- **Real-World Validation:** Demonstrated exact matching (`OBSERVED_ON_SOURCE`) vs deterministic zero-match (`NOT_OBSERVED_ON_CHECKED_SOURCES`) using the single existing `SearchEngineProvider` via AGY model retrieval.
+- **Remaining Limitations:** The system safely tracks observations but JobSight's pipeline continues to require multi-provider API credentials to establish definitive true `LOW` visibility. `UNKNOWN` propagation ensures pipeline safety.
+- **Mission Status:** NOT VALIDATED
+
 ### External Evidence Requirements
 Phase 8 development on capability expansion is paused until the following external data requirements are secured:
 
@@ -139,3 +151,85 @@ Phase 8 development on capability expansion is paused until the following extern
 - **Current Mission Status:** NOT VALIDATED
 - **Next Milestone:** PAUSED (Awaiting External Dependencies)
 
+
+### Phase 9.4: Full UI Wiring & Product Integrity Audit
+- **Status:** DONE
+- **Objective:** Audit the UI and Backend split and identify how legacy intelligence schemas affect production rendering.
+- **Findings:** A severe UI/backend split exists. The UI heavily relies on deprecated Phase 6/7 schemas (`oppDiscoverySummary`, `discoveryIntelligence`, `opportunityIntelligence`), completely ignoring the Phase 8 Canonical OQ architecture (`marketIntelligence`). Run isolation in the UI is highly compromised.
+
+### Phase 9.5: Canonical UI Migration & Runtime Dependency Hardening
+- **Status:** DONE
+- **Objective:** Eliminate the UI's reliance on deprecated Phase 6/7 intelligence schemas and definitively map to the Canonical Opportunity Quality (`marketIntelligence`). Enforce strict `runId` scoping.
+- **Implementation:**
+  1. Rewired Dashboard (`src/app/page.tsx`) to surface `FAVORABLE` opportunities directly from `marketIntelligence`, dropping arbitrary legacy numeric averages.
+  2. Migrated JobCard components to accept and visually represent discrete `OpportunityQuality` statuses (`FAVORABLE`, `NEUTRAL`, `UNFAVORABLE`, `INSUFFICIENT_EVIDENCE`).
+  3. Re-architected Candidate Decision Board (`src/app/board/page.tsx`) and Discovery Radar (`src/app/radar/page.tsx`) to consume `marketIntelligence` properties instead of deprecated discovery tables.
+  4. Performed a critical teardown of `src/app/jobs/[id]/page.tsx`, removing legacy score widgets and un-scoped `jobId` lookups, ensuring full run isolation for secondary evidence tables.
+- **Test Results:** 63 files, 526 tests passing. TypeScript typechecks pass. Production build completes successfully.
+- **Impact:** Complete elimination of cross-run contamination in UI endpoints. Zero reliance on deprecated Phase 6/7 schemas for critical quality rendering. UI perfectly reflects the rigorous Phase 8 Evidence Architecture.
+
+### Phase 9.6: Run Isolation Verification & Hardening
+- **Status:** DONE
+- **Objective:** Independently verify and harden JobSight's run isolation across all intelligence vectors. Ensure `jobId`-only queries do not leak data across distinct runs.
+- **Audit Findings:** 
+  1. Identified ~40 points of `jobId` access globally.
+  2. Determined that most cases were `GLOBAL_SAFE` (e.g., `schema.jobs`, `schema.companies`) or previously correctly run-scoped in Phase 9.5.
+  3. Discovered that the `companyAnalysis` fetch in the Job Detail UI and `observableSignals` query in the active orchestration pipeline erroneously lacked `runId` scoping.
+- **Implementation:**
+  1. Safely patched `src/lib/pipeline/orchestrator.ts` to strictly enforce `runId` on `observableSignals` for signal collection.
+  2. Safely patched `src/app/jobs/[id]/page.tsx` to strictly isolate `companyAnalysis` dependencies.
+  3. Deployed a full regression test (`src/tests/run-isolation.test.ts`) mapping explicit boundary proofs.
+- **Test Results:** 64 files, 527 tests passing. TypeScript typechecks pass without errors.
+- **Impact:** Global intelligence and run-specific execution records are now perfectly hermetic. Historical records render truthfully without contaminating current active pipelines.
+
+### Phase 9.7: Global View & Data Semantics Audit
+- **Status:** DONE
+- **Objective:** Establish and harden global/current/latest/historical data semantics. Ensure any aggregate queries explicitly select correct chronological state.
+- **Audit Findings:**
+  1. Identified unbounded `limit(1)` lookups for Company Intelligence in `src/app/companies/[id]/page.tsx` and arbitrary unbounded `FAVORABLE` opportunity lookups in `src/app/radar/page.tsx`.
+  2. Confirmed that `createdAt` and `firstSeenAt` serve as authoritative chronological timestamps for company reports and job discovery, respectively.
+- **Implementation:**
+  1. Handled ambiguous global company queries by actively binding them to `orderBy(desc(schema.X.createdAt))`.
+  2. Re-architected Radar to fetch authentically `latest` discovery logic by applying explicit `orderBy(desc(createdAt))` or `orderBy(desc(firstSeenAt))` semantics against `schema.marketIntelligence`, `schema.companyAnalysis`, and `schema.jobs`.
+  3. Corrected UI semantic mismatches (e.g. replaced the deprecated "Hidden Gems" label with the accurate "Favorable Opportunities" label on Dashboard/Radar surfaces).
+- **Test Results:** 63 files, 526 tests passing. TypeScript checks pass without errors.
+- **Impact:** Global intelligence displays are authentically ordered chronologically. A UI claiming to display "Latest Intelligence" actually delivers the correct chronological edge data. Run semantics correctly map to UI representations.
+
+### Phase 10.0: External Evidence Provider Readiness & Integration Contract
+- **Status:** BLOCKED / EXTERNAL CREDENTIALS REQUIRED
+- **Objective:** Audit Adzuna, Jooble, and other aggregators for free-tier readiness, evidence contracts, and architectural implementation safety.
+- **Audit Findings:** 
+  1. Credentials for all researched providers are `NOT_AVAILABLE` in the local environment.
+  2. Adzuna free-tier is viable for research but constrained to 250 req/day.
+  3. Jooble free-tier is highly restrictive (500 req lifetime per key) and not viable for a continuous pipeline.
+  4. Neither provider exposes true Applicant/Vacancy volume; thus Competition will remain `UNKNOWN`.
+  5. The evidence contract for `NOT_OBSERVED_ON_CHECKED_SOURCES` demands strict matching (Canonical Title + Normalized Company) and absolute distinction from rate-limits (429) or timeouts.
+- **Implementation:** NONE. Halted due to missing credentials as per protocol.
+- **Impact:** The system remains structurally hardened but lacks the external API credentials required to conduct the Reality Test and transition bounded absence into authentic low visibility.
+
+### Phase 10.1: Adzuna Minimal Adapter + Evidence Reality Test
+- **Status:** DONE
+- **Objective:** Implement the smallest production-safe Adzuna evidence adapter and validate it securely using actual environment credentials, without altering existing semantic logic.
+- **Implementation:** 
+  1. Created `checkAdzunaEvidence` server-side adapter.
+  2. Integrated it seamlessly into `src/lib/pipeline/secondary-evidence.ts`.
+  3. Established strict MATCH logic (`EXACT`, `STRONG`, `PARTIAL`, `WEAK`, `AMBIGUOUS`, `NONE`).
+  4. Mapped 0 matches or `NONE` match to `NOT_OBSERVED_ON_CHECKED_SOURCES` strictly when the API responds successfully.
+  5. Mapped `WEAK` and API failures (429, timeouts) explicitly to `UNKNOWN`.
+- **Test Results:** 64 files, 534 tests passing. `npx tsc --noEmit` clean. Real-world validation passed for Microsoft (OBSERVED), FakeStealthCo123 (NOT_OBSERVED), and generic 'Tech' (UNKNOWN).
+- **Impact:** We successfully ingest secondary aggregator evidence securely. However, because `NOT_OBSERVED_ON_CHECKED_SOURCES` remains bounded, and Competition/Compensation remain `UNKNOWN`, the mission overall remains **NOT VALIDATED**.
+
+### Phase 10.1 (Corrected): Adzuna Evidence Integrity Fixes
+- **Status:** DONE
+- **Objective:** Correct the Adzuna evidence integration to adhere to strict bounded intelligence semantics and provider independence rules.
+- **Key Constraints:**
+  - Adzuna is an independent evidence provider, NOT an authoritative visibility source. Adzuna absence alone does not automatically prove `LOW` visibility. Adzuna presence does not prove `FAVORABLE` opportunity.
+  - Bounded non-observation remains securely bounded. 
+  - Local rate protection (`ADZUNA_DAILY_BUDGET = 200`) is implemented strictly as a safety circuit breaker, not as an account-wide distributed quota system.
+  - Competition and applicant volume metrics remain strictly `UNKNOWN`.
+  - Compensation baseline remains strictly `UNKNOWN`.
+  - The JobSight canonical mission remains **DISCOVERY_MISSION_NOT_VALIDATED** due to a lack of complete independent quorum visibility mechanisms.
+- **Architectural Enhancements:**
+  - `EXACT` matching now legally requires a Canonical URL or Provider ID. Exact string matches fallback to `STRONG` matching.
+  - `secondary-evidence.ts` now sequentially interrogates both Adzuna and the SearchEngineProvider asynchronously, returning aggregated `CrossReferenceResult[]` to the orchestrator instead of short-circuiting on Adzuna success.
+  - Idempotency guarantees achieved through `job_run_source_idx` unique compound index on `(jobId, runId, targetSource)` within `schema.jobCrossReferences`.

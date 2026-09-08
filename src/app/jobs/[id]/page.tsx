@@ -143,7 +143,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
 
   // ── Company analysis (basic) ────────────────────────────────────────────────
   const compAnalysisRec = job.companyId
-    ? await db.select().from(schema.companyAnalysis).where(eq(schema.companyAnalysis.companyId, job.companyId)).limit(1)
+    ? await db.select().from(schema.companyAnalysis).where(and(eq(schema.companyAnalysis.companyId, job.companyId), eq(schema.companyAnalysis.runId, runId))).limit(1)
     : [];
   const compAnalysis = compAnalysisRec[0];
 
@@ -152,8 +152,8 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   const discoveryIntel = discIntelRec[0];
 
   // ── Evidence & scores ────────────────────────────────────────────────────────
-  const evidenceList = await db.select().from(schema.evidence).where(eq(schema.evidence.entityId, job.id));
-  const scoresList = await db.select().from(schema.scores).where(eq(schema.scores.jobId, job.id));
+  const evidenceList = await db.select().from(schema.evidence).where(and(eq(schema.evidence.entityId, job.id), eq(schema.evidence.runId, runId)));
+  const scoresList = await db.select().from(schema.scores).where(and(eq(schema.scores.jobId, job.id), eq(schema.scores.runId, runId)));
 
   const getScore = (type: string) => scoresList.find(s => s.scoreType === type)?.scoreValue;
   const scores = {
@@ -168,44 +168,48 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   const preferredSkillsEvidence = evidenceList.filter(e => e.field === 'preferredSkills');
   const salaryEvidence          = evidenceList.filter(e => e.field.toLowerCase().includes('salary'));
 
+  // ── CANONICAL MARKET INTELLIGENCE (PHASE 8) ─────────────────────────────────
+  const marketIntellRec = await db.select().from(schema.marketIntelligence).where(and(eq(schema.marketIntelligence.jobId, job.id), eq(schema.marketIntelligence.runId, runId))).limit(1);
+  const marketIntel = marketIntellRec[0] ?? null;
+
   // ── APPLICATION INTELLIGENCE (B5) ───────────────────────────────────────────
-  const appResultRec = await db.select().from(schema.applicationResults).where(eq(schema.applicationResults.jobId, job.id)).limit(1);
+  const appResultRec = await db.select().from(schema.applicationResults).where(and(eq(schema.applicationResults.jobId, job.id), eq(schema.applicationResults.runId, runId))).limit(1);
   const appResult = appResultRec[0] ?? null;
 
-  const appSummaryRec = await db.select().from(schema.applicationSummary).where(eq(schema.applicationSummary.jobId, job.id)).limit(1);
+  const appSummaryRec = await db.select().from(schema.applicationSummary).where(and(eq(schema.applicationSummary.jobId, job.id), eq(schema.applicationSummary.runId, runId))).limit(1);
   const appSummary = appSummaryRec[0] ?? null;
 
-  const appRecommendationRec = await db.select().from(schema.applicationRecommendations).where(eq(schema.applicationRecommendations.jobId, job.id)).limit(1);
+  const appRecommendationRec = await db.select().from(schema.applicationRecommendations).where(and(eq(schema.applicationRecommendations.jobId, job.id), eq(schema.applicationRecommendations.runId, runId))).limit(1);
   const appRecommendation = appRecommendationRec[0] ?? null;
 
   // ── COMPETITION INTELLIGENCE (B2) ───────────────────────────────────────────
-  const compResultRec = await db.select().from(schema.competitionResults).where(eq(schema.competitionResults.jobId, job.id)).limit(1);
+  const compResultRec = await db.select().from(schema.competitionResults).where(and(eq(schema.competitionResults.jobId, job.id), eq(schema.competitionResults.runId, runId))).limit(1);
   const compResult = compResultRec[0] ?? null;
 
-  const compSummaryRec = await db.select().from(schema.competitionSummary).where(eq(schema.competitionSummary.jobId, job.id)).limit(1);
+  const compSummaryRec = await db.select().from(schema.competitionSummary).where(and(eq(schema.competitionSummary.jobId, job.id), eq(schema.competitionSummary.runId, runId))).limit(1);
   const compSummaryData = compSummaryRec[0] ?? null;
 
   // ── COMPANY OPPORTUNITY INTELLIGENCE (B3) ───────────────────────────────────
   const coOpportunityRec = job.companyId
-    ? await db.select().from(schema.companyOpportunity).where(eq(schema.companyOpportunity.companyId, job.companyId)).limit(1)
+    ? await db.select().from(schema.companyOpportunity).where(and(eq(schema.companyOpportunity.companyId, job.companyId), eq(schema.companyOpportunity.runId, runId))).limit(1)
     : [];
   const coOpportunity = coOpportunityRec[0] ?? null;
 
   const coSummaryRec = job.companyId
-    ? await db.select().from(schema.companySummary).where(eq(schema.companySummary.companyId, job.companyId)).limit(1)
+    ? await db.select().from(schema.companySummary).where(and(eq(schema.companySummary.companyId, job.companyId), eq(schema.companySummary.runId, runId))).limit(1)
     : [];
   const coSummary = coSummaryRec[0] ?? null;
 
   const coOutlookRec = job.companyId
-    ? await db.select().from(schema.companyOutlook).where(eq(schema.companyOutlook.companyId, job.companyId)).limit(1)
+    ? await db.select().from(schema.companyOutlook).where(and(eq(schema.companyOutlook.companyId, job.companyId), eq(schema.companyOutlook.runId, runId))).limit(1)
     : [];
   const coOutlook = coOutlookRec[0] ?? null;
 
-  // ── DISCOVERY INTELLIGENCE (B4) ─────────────────────────────────────────────
-  const oppDiscResultRec = await db.select().from(schema.oppDiscoveryResults).where(eq(schema.oppDiscoveryResults.jobId, job.id)).limit(1);
+  // ── DISCOVERY INTELLIGENCE (B4) - LEGACY ────────────────────────────────────
+  const oppDiscResultRec = await db.select().from(schema.oppDiscoveryResults).where(and(eq(schema.oppDiscoveryResults.jobId, job.id), eq(schema.oppDiscoveryResults.runId, runId))).limit(1);
   const oppDiscResult = oppDiscResultRec[0] ?? null;
 
-  const oppDiscSummaryRec = await db.select().from(schema.oppDiscoverySummary).where(eq(schema.oppDiscoverySummary.jobId, job.id)).limit(1);
+  const oppDiscSummaryRec = await db.select().from(schema.oppDiscoverySummary).where(and(eq(schema.oppDiscoverySummary.jobId, job.id), eq(schema.oppDiscoverySummary.runId, runId))).limit(1);
   const oppDiscSummary = oppDiscSummaryRec[0] ?? null;
 
   // ── Derived helpers ──────────────────────────────────────────────────────────
@@ -963,98 +967,54 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             )}
           </Card>
 
-          {/* ── DISCOVERY INTELLIGENCE (B4) — ENHANCED ───────────────────── */}
+          {/* ── CANONICAL OPPORTUNITY QUALITY (PHASE 8) ────────────────────── */}
           <Card>
-            <h2 style={titleStyle}><IconStar/> Discovery Quality</h2>
+            <h2 style={titleStyle}><IconStar/> Opportunity Quality</h2>
 
-            {oppDiscResult ? (
+            {marketIntel ? (
               <>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
                   <StatusBadge
-                    status={oppDiscResult.level}
-                    variant={discoveryVariant(oppDiscResult.level)}
+                    status={marketIntel.opportunityIntelligence.replace(/_/g, ' ')}
+                    variant={
+                      marketIntel.opportunityIntelligence === 'FAVORABLE' ? 'success' :
+                      marketIntel.opportunityIntelligence === 'NEUTRAL' ? 'warning' :
+                      marketIntel.opportunityIntelligence === 'UNFAVORABLE' ? 'danger' : 'neutral'
+                    }
                   />
-                  {discoveryIntel?.hiddenGem && (
-                    <StatusBadge status="💎 Hidden Gem" variant="info" />
+                  {marketIntel.opportunityIntelligence === 'FAVORABLE' && (
+                    <StatusBadge status="💎 Favorable Opportunity" variant="info" />
                   )}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Score</span>
-                    <span style={{ fontSize: '1.25rem', fontWeight: 700, letterSpacing: '-0.02em' }}>
-                      {oppDiscResult.score}<span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>/100</span>
-                    </span>
-                  </div>
                 </div>
-                <div style={{ marginBottom: 16 }}>
-                  <ProgressBar
-                    progress={oppDiscResult.score}
-                    color={scoreProgressColor(oppDiscResult.score)}
-                    height={5}
-                  />
-                </div>
-                {oppDiscSummary && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                    <div style={rowStyle}>
-                      <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Quality:</span>
-                      <strong style={{ fontSize: '0.875rem' }}>{oppDiscSummary.quality}</strong>
-                    </div>
-                    <div style={rowStyle}>
-                      <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Visibility:</span>
-                      <strong style={{ fontSize: '0.875rem' }}>{oppDiscSummary.visibility}</strong>
-                    </div>
-                    <div style={rowStyle}>
-                      <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Authenticity:</span>
-                      <strong style={{ fontSize: '0.875rem' }}>{oppDiscSummary.authenticity}</strong>
-                    </div>
-                    <div style={rowStyle}>
-                      <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Uniqueness:</span>
-                      <strong style={{ fontSize: '0.875rem' }}>{oppDiscSummary.uniqueness}</strong>
-                    </div>
-                    <div style={{ ...rowStyle, borderBottom: 'none' }}>
-                      <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Confidence:</span>
-                      <strong style={{ fontSize: '0.875rem' }}>{oppDiscSummary.confidence}%</strong>
-                    </div>
-                  </div>
-                )}
-                {oppDiscResult.confidence > 0 && !oppDiscSummary && (
-                  <div style={{ marginTop: 8, fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'right' }}>
-                    Confidence: {oppDiscResult.confidence}%
-                  </div>
-                )}
-              </>
-            ) : discoveryIntel ? (
-              /* Fall back to basic discoveryIntelligence */
-              <>
-                {discoveryIntel.hiddenGem && (
-                  <div style={{ marginBottom: 12 }}>
-                    <StatusBadge status="💎 Hidden Gem" variant="info" />
-                  </div>
-                )}
+                
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
                   <div style={rowStyle}>
-                    <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Visibility:</span>
-                    <strong style={{ fontSize: '0.875rem' }}>{discoveryIntel.visibility || '—'}</strong>
+                    <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Visibility Evidence:</span>
+                    <strong style={{ fontSize: '0.875rem' }}>
+                      {marketIntel.visibilityLevel.replace(/_/g, ' ')}
+                    </strong>
                   </div>
                   <div style={rowStyle}>
-                    <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Authenticity:</span>
-                    <Link href={`/jobs?authenticity=${discoveryIntel.authenticity || 'ALL'}`} style={{ textDecoration: 'none' }}>
-                      <strong style={{ fontSize: '0.875rem' }}>{discoveryIntel.authenticity || '—'}</strong>
-                    </Link>
-                  </div>
-                  <div style={rowStyle}>
-                    <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Freshness:</span>
-                    <strong style={{ fontSize: '0.875rem' }}>{discoveryIntel.freshness || '—'}</strong>
+                    <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Competition Evidence:</span>
+                    <strong style={{ fontSize: '0.875rem' }}>
+                      {marketIntel.competitionLevel.replace(/_/g, ' ')}
+                    </strong>
                   </div>
                   <div style={{ ...rowStyle, borderBottom: 'none' }}>
-                    <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Source Trust:</span>
-                    <strong style={{ fontSize: '0.875rem' }}>{discoveryIntel.sourceTrust || '—'}</strong>
+                    <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Friction:</span>
+                    <strong style={{ fontSize: '0.875rem' }}>
+                      {marketIntel.frictionLevel.replace(/_/g, ' ')}
+                    </strong>
                   </div>
                 </div>
-                <div style={{ marginTop: 8, fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                  Deep discovery analysis not yet run.
-                </div>
               </>
+            ) : oppDiscResult ? (
+              /* Fallback to obsolete discovery intelligence if canonical not present */
+              <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+                <em>Legacy discovery result: {oppDiscResult.level}</em>
+              </div>
             ) : (
-              <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Discovery data unavailable.</div>
+              <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Opportunity quality data unavailable.</div>
             )}
           </Card>
 

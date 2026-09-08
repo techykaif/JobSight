@@ -709,4 +709,6 @@ export const jobCrossReferences = sqliteTable('job_cross_references', {
   matchStrength: text('match_strength'), // EXACT, PARTIAL, LOW
   observedAt: text('observed_at').notNull(),
   createdAt: text('created_at').notNull(),
-});
+}, (table) => ({
+  jobRunSourceIdx: uniqueIndex('job_run_source_idx').on(table.jobId, table.runId, table.targetSource),
+}));

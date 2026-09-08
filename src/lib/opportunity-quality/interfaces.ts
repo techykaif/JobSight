@@ -2,11 +2,12 @@ export type OpportunityLevel = 'FAVORABLE' | 'NEUTRAL' | 'UNFAVORABLE' | 'INSUFF
 export type ConfidenceLevel = 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
 
 export type SignalLevel = 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
+export type VisibilitySignalLevel = 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN' | 'NOT_OBSERVED_ON_CHECKED_SOURCES';
 export type CompensationSignalLevel = 'EXCEPTIONAL' | 'TARGET' | 'BELOW_TARGET' | 'UNKNOWN';
 export type FreshnessSignalLevel = 'NEW' | 'AGING' | 'STALE' | 'UNKNOWN';
 
 export interface OpportunityQualitySignals {
-  visibility: SignalLevel;
+  visibility: VisibilitySignalLevel;
   competition: SignalLevel;
   applicantVolume: number | 'UNKNOWN';
   compensation: CompensationSignalLevel;

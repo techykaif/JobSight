@@ -102,14 +102,24 @@ export default async function DashboardPage() {
   const monitorCount   = Number(watchlistsRes[0]?.count ?? 0);
 
   // ── Discovery intelligence ──────────────────────────────────────────────────
-  const hiddenGemsRes = await db.select({ count: sql<number>`count(*)` })
-    .from(schema.discoveryIntelligence)
-    .where(eq(schema.discoveryIntelligence.hiddenGem, true));
-  const hiddenGems = Number(hiddenGemsRes[0]?.count ?? 0);
+  const favorableOqRes = latestRun
+    ? await db.select({ count: sql<number>`count(*)` })
+      .from(schema.marketIntelligence)
+      .where(and(
+        eq(schema.marketIntelligence.runId, latestRun!.id),
+        eq(schema.marketIntelligence.opportunityIntelligence, 'FAVORABLE')
+      ))
+    : [{ count: 0 }];
+  const favorableCount = Number(favorableOqRes[0]?.count ?? 0);
 
-  const lowCompRes = await db.select({ count: sql<number>`count(*)` })
-    .from(schema.discoveryIntelligence)
-    .where(eq(schema.discoveryIntelligence.competition, 'LOW'));
+  const lowCompRes = latestRun
+    ? await db.select({ count: sql<number>`count(*)` })
+      .from(schema.marketIntelligence)
+      .where(and(
+        eq(schema.marketIntelligence.runId, latestRun!.id),
+        eq(schema.marketIntelligence.competitionLevel, 'LOW')
+      ))
+    : [{ count: 0 }];
   const lowestCompetition = Number(lowCompRes[0]?.count ?? 0);
 
   // ── Portfolio ───────────────────────────────────────────────────────────────
@@ -120,19 +130,29 @@ export default async function DashboardPage() {
   const companiesRes = await db.select({ count: sql<number>`count(*)` }).from(schema.companies);
   const totalCompanies = Number(companiesRes[0]?.count ?? 0);
 
-  const avgOppRes = await db.select({ avg: sql<number>`avg(${schema.opportunityIntelligence.opportunityScore})` })
-    .from(schema.opportunityIntelligence);
-  const avgOpportunityScore = Math.round(Number(avgOppRes[0]?.avg ?? 0));
-
+  // Note: avgOpportunityScore is obsolete numeric Phase 7 construct. Replaced with Favorable Count.
+  
   // ── Application intelligence (Phase B5) ────────────────────────────────────
-  const readyNowRes = await db.select({ count: sql<number>`count(*)` })
-    .from(schema.applicationResults)
-    .where(eq(schema.applicationResults.readinessLevel, 'Ready Now'));
+  // Legacy numeric/readiness scores (Phase B5) intentionally preserved as secondary context
+  // per rule 3 (Do not delete legacy backend code yet), but scoped correctly.
+  const readyNowRes = latestRun 
+    ? await db.select({ count: sql<number>`count(*)` })
+      .from(schema.applicationResults)
+      .where(and(
+        eq(schema.applicationResults.runId, latestRun.id),
+        eq(schema.applicationResults.readinessLevel, 'Ready Now')
+      ))
+    : [{ count: 0 }];
   const readyNowCount = Number(readyNowRes[0]?.count ?? 0);
 
-  const needsWorkRes = await db.select({ count: sql<number>`count(*)` })
-    .from(schema.applicationResults)
-    .where(eq(schema.applicationResults.readinessLevel, 'Needs Improvement'));
+  const needsWorkRes = latestRun
+    ? await db.select({ count: sql<number>`count(*)` })
+      .from(schema.applicationResults)
+      .where(and(
+        eq(schema.applicationResults.runId, latestRun.id),
+        eq(schema.applicationResults.readinessLevel, 'Needs Improvement')
+      ))
+    : [{ count: 0 }];
   const needsWorkCount = Number(needsWorkRes[0]?.count ?? 0);
 
   const avgReadinessRes = await db.select({ avg: sql<number>`avg(${schema.applicationResults.score})` })
@@ -179,6 +199,7 @@ export default async function DashboardPage() {
     firstSeenAt: string;
     decision: string;
     competition: string | null;
+    opportunity: string | null;
     score: number | null;
   };
 
@@ -199,25 +220,21 @@ export default async function DashboardPage() {
       .leftJoin(schema.companies, eq(schema.jobs.companyId, schema.companies.id))
       .where(inArray(schema.jobs.id, priorityJobIds));
 
-    // Fetch competition for these jobs
-    const compRows = await db.select({
-      jobId: schema.discoveryIntelligence.jobId,
-      competition: schema.discoveryIntelligence.competition,
+    // Fetch competition and opportunity from canonical market intelligence
+    const mktRows = await db.select({
+      jobId: schema.marketIntelligence.jobId,
+      competition: schema.marketIntelligence.competitionLevel,
+      opportunity: schema.marketIntelligence.opportunityIntelligence,
     })
-      .from(schema.discoveryIntelligence)
-      .where(inArray(schema.discoveryIntelligence.jobId, priorityJobIds));
-
-    // Fetch opportunity scores for these jobs
-    const scoreRows = await db.select({
-      jobId: schema.opportunityIntelligence.jobId,
-      score: schema.opportunityIntelligence.opportunityScore,
-    })
-      .from(schema.opportunityIntelligence)
-      .where(inArray(schema.opportunityIntelligence.jobId, priorityJobIds));
+      .from(schema.marketIntelligence)
+      .where(and(
+        inArray(schema.marketIntelligence.jobId, priorityJobIds),
+        eq(schema.marketIntelligence.runId, latestRun!.id)
+      ));
 
     const decisionMap = new Map(actionableDecisions.map(d => [d.jobId, d.decision]));
-    const compMap     = new Map(compRows.map(c => [c.jobId, c.competition]));
-    const scoreMap    = new Map(scoreRows.map(s => [s.jobId, s.score]));
+    const compMap     = new Map(mktRows.map(c => [c.jobId, c.competition]));
+    const oppMap      = new Map(mktRows.map(s => [s.jobId, s.opportunity]));
 
     priorityJobs = jobRows.map(j => ({
       id:          j.id,
@@ -229,14 +246,20 @@ export default async function DashboardPage() {
       firstSeenAt: j.firstSeenAt,
       decision:    decisionMap.get(j.id) ?? 'CONSIDER',
       competition: compMap.get(j.id)    ?? null,
-      score:       scoreMap.get(j.id)   ?? null,
+      opportunity: (oppMap.get(j.id) as string) ?? null,
+      score:       null, // Obsolete numeric score removed
     }));
 
-    // Sort: APPLY first, then by score descending
+    // Sort: APPLY first, then by FAVORABLE opportunity
     priorityJobs.sort((a, b) => {
       if (a.decision === 'APPLY' && b.decision !== 'APPLY') return -1;
       if (b.decision === 'APPLY' && a.decision !== 'APPLY') return 1;
-      return (b.score ?? 0) - (a.score ?? 0);
+      
+      const aIsFav = a.opportunity === 'FAVORABLE';
+      const bIsFav = b.opportunity === 'FAVORABLE';
+      if (aIsFav && !bIsFav) return -1;
+      if (bIsFav && !aIsFav) return 1;
+      return 0;
     });
   }
 
@@ -421,8 +444,8 @@ export default async function DashboardPage() {
               />
               <MetricCard
                 href="/radar"
-                label="Hidden Gems"
-                value={hiddenGems}
+                label="Favorable Opportunities"
+                value={favorableCount}
                 icon={
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--info)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
@@ -539,8 +562,28 @@ export default async function DashboardPage() {
                 label="Highest Salary"
                 value={highestSalaryFormatted}
                 icon={
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--warning-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--success-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
+                  </svg>
+                }
+              />
+              <MetricCard
+                href="/radar"
+                label="Favorable Opportunities"
+                value={favorableCount}
+                icon={
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--info)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                  </svg>
+                }
+              />
+              <MetricCard
+                href="/radar"
+                label="Low Competition"
+                value={lowestCompetition}
+                icon={
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--warning-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10"/><polyline points="12 8 12 12 14 14"/>
                   </svg>
                 }
               />
@@ -551,16 +594,6 @@ export default async function DashboardPage() {
                 icon={
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
-                  </svg>
-                }
-              />
-              <MetricCard
-                href="/radar"
-                label="Avg Opportunity Score"
-                value={avgOpportunityScore > 0 ? `${avgOpportunityScore}/100` : 'N/A'}
-                icon={
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                   </svg>
                 }
               />

@@ -660,7 +660,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
 
         for (const job of jobsForCompany) {
           // get signals
-          const sigs = await db.select().from(schema.observableSignals).where(eq(schema.observableSignals.jobId, job.id));
+          const sigs = await db.select().from(schema.observableSignals).where(and(eq(schema.observableSignals.jobId, job.id), eq(schema.observableSignals.runId, runId)));
           foundationSignalsByJob[job.id] = sigs.map(s => ({ type: s.signalType, value: s.observedValue }));
 
           // get comp
@@ -754,9 +754,23 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
           if (row.source?.sourceType) context.sourceProviderType = row.source.sourceType;
           if (artifactMap.get(row.job.id)) context.rawContent = artifactMap.get(row.job.id);
 
-          const crossRef = await checkSecondaryEvidence(row.job as any, context.sourceProviderType);
-          await persistSecondaryEvidence(row.job.id, runId, crossRef);
-          context.secondaryEvidence = crossRef;
+          const crossRefResults = await checkSecondaryEvidence(row.job as any, context.sourceProviderType);
+          await persistSecondaryEvidence(row.job.id, runId, crossRefResults);
+          
+          let aggregatedResult = crossRefResults.find(r => r.status === 'OBSERVED_ON_SOURCE');
+          if (!aggregatedResult) {
+            const notObserved = crossRefResults.filter(r => r.status === 'NOT_OBSERVED_ON_CHECKED_SOURCES');
+            if (notObserved.length > 0) {
+              aggregatedResult = {
+                status: 'NOT_OBSERVED_ON_CHECKED_SOURCES',
+                targetSource: notObserved.map(n => n.targetSource).join(','),
+                matchStrength: 'NONE'
+              };
+            } else {
+              aggregatedResult = crossRefResults[0];
+            }
+          }
+          context.secondaryEvidence = aggregatedResult;
 
           const result = evaluateCanonicalOpportunityQuality(context);
           
@@ -825,7 +839,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
         const { job, company, observation, source } = row;
 
         // get signals
-        const sigs = await db.select().from(schema.observableSignals).where(eq(schema.observableSignals.jobId, job.id));
+        const sigs = await db.select().from(schema.observableSignals).where(and(eq(schema.observableSignals.jobId, job.id), eq(schema.observableSignals.runId, runId)));
         const foundationSignals = sigs.map(s => ({ type: s.signalType, value: s.observedValue }));
 
         // get comp
