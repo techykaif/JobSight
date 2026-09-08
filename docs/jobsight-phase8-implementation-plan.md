@@ -75,5 +75,36 @@
   4. Verified that `UNKNOWN` correctly passes through the Canonical Opportunity Quality system, yielding `INSUFFICIENT_EVIDENCE` where competition dependencies exist, completely preventing fabricated FAVORABLE claims.
 - **Residual Risks:**
   - Downstream scoring systems will now cleanly receive `UNKNOWN` competition. Without verified competition signals, fewer opportunities will achieve `FAVORABLE` status organically, accurately reflecting the strict evidence bounds but potentially yielding lower volume.
-- **Next Milestone:** Phase 8.6 (Candidate Fit Independence)
+- **Next Milestone:** Phase 8.6 (Candidate Fit Independence) — *See below for actual Phase 8.6 work executed.*
+
+### Phase 8.5.1 & 8.5.2: Canonical Opportunity Quality Contract Correction
+- **Status:** DONE
+- **Objective:** Correct the Opportunity Quality engine to prevent `UNKNOWN` competition from acting as a global veto against legitimate `FAVORABLE` opportunities.
+- **Implementation:**
+  1. Replaced hardcoded global veto with a multi-dimensional boolean evaluation matrix.
+  2. `FAVORABLE` is now granted if there is a verified intrinsic positive signal (`EXCEPTIONAL` compensation, explicitly `LOW` competition, or genuinely `LOW` visibility) and no negative vetoes exist.
+  3. `HIGH` competition, `STALE` freshness, and `BELOW_TARGET` compensation are enforced as hard negative vetoes.
+  4. `NEW` freshness is correctly treated as neutral urgency, not intrinsic quality.
+  5. `LOW` authenticity safely demotes `FAVORABLE` to `NEUTRAL`.
+  6. Added 13 targeted boundary tests to `canonical-opportunity.test.ts`.
+
+### Phase 8.6: Opportunity Quality Integration & Compensation Evidence Audit
+- **Status:** DONE
+- **Historical Context:** Originally scoped as "Candidate Fit Independence". The actual executed scope was an architectural integration and evidence feasibility audit to ensure the corrected Phase 8.5.2 contract was physically and logically sound in production.
+- **Findings - Integration Audit:**
+  1. **Source of Truth:** Canonical OQ (`src/lib/opportunity-quality/engine.ts`) is the strict single active source of truth.
+  2. **Run Scoping:** `marketIntelligence` persistence is perfectly run-scoped.
+  3. **Compatibility:** `schema.scores` is a pure one-way compatibility projection (`FAVORABLE -> 85`, etc.), safely shielding downstream consumers.
+  4. **B7 & Candidate Decision:** B7 safely consumes the compatibility projection. Candidate Decision safely consumes the canonical `marketIntelligence` record separately from Candidate Fit.
+  5. **Stretch:** Independently protected. Stretch explicitly requires `visibilityLevel === 'LOW'` AND `competitionLevel === 'LOW'`, meaning `EXCEPTIONAL` compensation alone cannot bypass the `EXTREME_EXPERIENCE_GAP` veto.
+- **Findings - Compensation Evidence Feasibility:**
+  1. Raw salary evidence bounds (`salaryMin`, `salaryMax`) already exist and are successfully extracted by Stage B and `html-enrichment.ts`, and persisted to `schema.jobs`.
+  2. **Baseline Gap:** No legitimate market compensation baseline exists in the repository.
+  3. Candidate salary expectations are strictly candidate-specific and cannot be used as an intrinsic market baseline without violating Candidate Fit Independence.
+  4. General LLM pretrained knowledge constitutes "unsupported inference" and violates the Phase 8 evidence mandate.
+  5. Employer marketing claims ("top of market") are subjective and insufficient as objective evidence.
+- **Conclusion:** Compensation classification (`EXCEPTIONAL`, `TARGET`, `BELOW_TARGET`) correctly remains `UNKNOWN` in production. No new salary extraction architecture or production implementation is required at this time.
+
+- **Current Mission Status:** NOT VALIDATED
+- **Next Milestone:** Phase 8.7 (To Be Determined)
 
