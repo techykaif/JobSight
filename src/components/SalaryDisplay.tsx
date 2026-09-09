@@ -20,7 +20,7 @@ export function SalaryDisplay({
   }
 
   const formatNumber = (num?: number | null) => {
-    if (!num) return '';
+    if (!num || !Number.isFinite(num)) return '';
     if (num >= 10000000) return `₹${(num / 10000000).toFixed(1)}Cr`; // INR Crores
     if (num >= 100000) return `₹${(num / 100000).toFixed(1)}L`; // INR Lakhs
     if (num >= 1000) return `${(num / 1000).toFixed(1)}k`; // Thousands

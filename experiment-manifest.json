@@ -1,0 +1,29 @@
+{
+  "experimentId": "exp-1788907785264",
+  "requestedRuns": 3,
+  "launchedRuns": 3,
+  "runs": [
+    {
+      "runId": "2a0c7a6f-585b-4f8f-a020-66e85f8cf3ae",
+      "hunt": "TEST 1 - CONCURRENCY A",
+      "status": "COMPLETED_WITH_FAILURES"
+    },
+    {
+      "runId": "4b82d885-71f8-445b-80b3-b82fe6d316bc",
+      "hunt": "TEST 2 - CONCURRENCY B",
+      "status": "COMPLETED_WITH_FAILURES"
+    },
+    {
+      "runId": "fccad63f-795f-48f8-b386-7f035567fa61",
+      "hunt": "TEST 3 - CONCURRENCY C",
+      "status": "COMPLETED_WITH_FAILURES"
+    }
+  ],
+  "summary": {
+    "terminal": 3,
+    "running": 0,
+    "failed": 0,
+    "completed": 0,
+    "completedWithFailures": 3
+  }
+}

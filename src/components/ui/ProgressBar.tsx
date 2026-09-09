@@ -15,7 +15,8 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   showLabel = false,
   className = '',
 }) => {
-  const clampedProgress = Math.min(100, Math.max(0, progress));
+  const safeProgress = Number.isFinite(progress) ? progress : 0;
+  const clampedProgress = Math.min(100, Math.max(0, safeProgress));
 
   return (
     <div className={className} style={{ width: '100%' }} role="progressbar" aria-valuenow={clampedProgress} aria-valuemin={0} aria-valuemax={100}>

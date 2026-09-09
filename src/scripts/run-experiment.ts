@@ -11,7 +11,15 @@ const manifestPath = `experiment-manifest-${experimentId}.json`;
 
 const hunts = [
   { name: 'HUNT 01 - FRESHER SOFTWARE ENGINEER', roles: ['Junior Software Engineer', 'Entry Level Software Engineer'], strategy: 'strategy_default' },
-  { name: 'HUNT 02 - REMOTE FULLSTACK', roles: ['Full Stack Engineer', 'Full Stack Developer'], strategy: 'strategy_default' }
+  { name: 'HUNT 02 - REMOTE FULLSTACK', roles: ['Full Stack Engineer', 'Full Stack Developer'], strategy: 'strategy_default' },
+  { name: 'HUNT 03 - REMOTE FRONTEND', roles: ['Frontend Engineer', 'Frontend Developer'], strategy: 'strategy_default' },
+  { name: 'HUNT 04 - REMOTE BACKEND', roles: ['Backend Engineer', 'Software Engineer'], strategy: 'strategy_default' },
+  { name: 'HUNT 05 - STARTUP ENGINEERING', roles: ['Software Engineer'], strategy: 'strategy_startup' },
+  { name: 'HUNT 06 - SMALL / MID-SIZE EMPLOYER', roles: ['Software Engineer', 'Developer'], strategy: 'strategy_startup' },
+  { name: 'HUNT 07 - ATS DIVERSITY', roles: ['Software Engineer'], strategy: 'strategy_default' },
+  { name: 'HUNT 08 - EARLY-STAGE COMPANY', roles: ['Software Engineer', 'Full Stack Engineer'], strategy: 'strategy_stealth' },
+  { name: 'HUNT 09 - REMOTE WEB ENGINEERING', roles: ['Web Engineer', 'Frontend Engineer'], strategy: 'strategy_default' },
+  { name: 'HUNT 10 - BROAD SOFTWARE ENGINEERING', roles: ['Software Engineer'], strategy: 'strategy_default' }
 ];
 
 async function runSingleHunt(huntConfig: typeof hunts[0]): Promise<string> {

@@ -17,6 +17,7 @@ export const SalaryBadge: React.FC<SalaryBadgeProps> = ({
   className = '',
 }) => {
   const formatSalary = (val: number) => {
+    if (!Number.isFinite(val)) return '?';
     return val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val.toString();
   };
 

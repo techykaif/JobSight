@@ -60,13 +60,15 @@ const HUNT_DOT_COLOR: Record<string, string> = {
 // ─── page ────────────────────────────────────────────────────────────────────
 
 import { getActiveRun } from '@/lib/pipeline/active-run';
+import { toUICategory } from '@/lib/candidate-decision/mapping';
+import { safeNumber, safeRound, safeJobAge } from '@/lib/utils/safe-number';
 
 export default async function DashboardPage() {
   const latestRun = await getActiveRun();
 
   // ── Core counts ────────────────────────────────────────────────────────────
   const jobsCountRes = await db.select({ count: sql<number>`count(*)` }).from(schema.jobs);
-  const totalJobs = Number(jobsCountRes[0]?.count ?? 0);
+  const totalJobs = safeNumber(jobsCountRes[0]?.count);
 
   const cdRes = latestRun
     ? await db.select({
@@ -86,28 +88,38 @@ export default async function DashboardPage() {
         .groupBy(schema.decisions.decision)
     : [];
 
-  const applyCount        = Number(cdRes.find(d => d.finalDecision === 'APPLY')?.count ?? 0);
-  const applyThisWeekCount= Number(cdRes.find(d => d.finalDecision === 'REVIEW')?.count ?? 0);
-  const researchCount     = Number(cdRes.find(d => d.finalDecision === 'INSUFFICIENT_EVIDENCE')?.count ?? 0);
-  const rejectedCount     = Number(cdRes.find(d => d.finalDecision === 'SKIP' || d.finalDecision === 'INELIGIBLE')?.count ?? 0);
+  const applyCount        = safeNumber(cdRes.find(d => d.finalDecision === 'APPLY')?.count);
+  const applyThisWeekCount= safeNumber(cdRes.find(d => d.finalDecision === 'REVIEW')?.count);
+  const researchCount     = safeNumber(cdRes.find(d => d.finalDecision === 'INSUFFICIENT_EVIDENCE')?.count);
+  // Rejected = SKIP + INELIGIBLE. These are separate groupBy rows, so we must sum both.
+  const skipCount         = safeNumber(cdRes.find(d => d.finalDecision === 'SKIP')?.count);
+  const ineligibleCount   = safeNumber(cdRes.find(d => d.finalDecision === 'INELIGIBLE')?.count);
+  const rejectedCount     = skipCount + ineligibleCount;
 
   const latestTotalJobsRes = latestRun
     ? await db.select({ count: sql<number>`count(*)` }).from(schema.jobObservations).where(eq(schema.jobObservations.runId, latestRun.id))
     : [{ count: 0 }];
-  const latestTotalJobs = Number(latestTotalJobsRes[0]?.count ?? 0);
-  const latestSkipCount = Number(decisionsRes.find(d => d.decision === 'SKIP')?.count ?? 0);
+  const latestTotalJobs = safeNumber(latestTotalJobsRes[0]?.count);
+  const latestSkipCount = safeNumber(decisionsRes.find(d => d.decision === 'SKIP')?.count);
   const qualifiedJobs = latestTotalJobs - latestSkipCount;
 
-  // Monitor = jobs with finalDecision PENDING in the active run (matches Decision Board 'Monitor' bucket exactly)
-  const monitorRes = latestRun
+  // Monitor = jobs observed in the active run whose candidateDecision is either
+  // NULL (no row) or explicitly 'PENDING'. This matches the Decision Board's
+  // bucketing logic: (j.finalDecision || 'PENDING') === 'PENDING'
+  //
+  // We count observed jobs minus those with a non-PENDING candidateDecision.
+  const pendingExplicitCount = safeNumber(cdRes.find(d => d.finalDecision === 'PENDING')?.count);
+  const totalCdRowsRes = latestRun
     ? await db.select({ count: sql<number>`count(*)` })
         .from(schema.candidateDecisions)
-        .where(and(
-          eq(schema.candidateDecisions.runId, latestRun.id),
-          eq(schema.candidateDecisions.finalDecision, 'PENDING')
-        ))
+        .where(eq(schema.candidateDecisions.runId, latestRun.id))
     : [{ count: 0 }];
-  const monitorCount = Number(monitorRes[0]?.count ?? 0);
+  const totalCdRows = safeNumber(totalCdRowsRes[0]?.count);
+  // Jobs without a candidateDecision row = observed jobs - jobs with a candidateDecision row
+  // Jobs with PENDING row are already in pendingExplicitCount
+  // Total monitor = (observed - totalCdRows) + pendingExplicitCount
+  const jobsWithNoCd = Math.max(0, latestTotalJobs - totalCdRows);
+  const monitorCount = jobsWithNoCd + pendingExplicitCount;
 
   // ── Discovery intelligence ──────────────────────────────────────────────────
   const favorableOqRes = latestRun
@@ -118,7 +130,7 @@ export default async function DashboardPage() {
         eq(schema.marketIntelligence.opportunityIntelligence, 'FAVORABLE')
       ))
     : [{ count: 0 }];
-  const favorableCount = Number(favorableOqRes[0]?.count ?? 0);
+  const favorableCount = safeNumber(favorableOqRes[0]?.count);
 
   const lowCompRes = latestRun
     ? await db.select({ count: sql<number>`count(*)` })
@@ -128,7 +140,7 @@ export default async function DashboardPage() {
         eq(schema.marketIntelligence.competitionLevel, 'LOW')
       ))
     : [{ count: 0 }];
-  const lowestCompetition = Number(lowCompRes[0]?.count ?? 0);
+  const lowestCompetition = safeNumber(lowCompRes[0]?.count);
 
   // ── Portfolio ───────────────────────────────────────────────────────────────
   // Highest salary: scoped to jobs observed in the active run, salaryMax must be present (non-null, > 0)
@@ -142,11 +154,11 @@ export default async function DashboardPage() {
         ))
         .where(sql`${schema.jobs.salaryMax} IS NOT NULL AND ${schema.jobs.salaryMax} > 0`)
     : [{ maxSal: 0 }];
-  const highestSalary = Number(maxSalaryRes[0]?.maxSal ?? 0);
+  const highestSalary = safeNumber(maxSalaryRes[0]?.maxSal);
   const highestSalaryFormatted = highestSalary > 0 ? formatSalary(highestSalary) : 'N/A';
 
   const companiesRes = await db.select({ count: sql<number>`count(*)` }).from(schema.companies);
-  const totalCompanies = Number(companiesRes[0]?.count ?? 0);
+  const totalCompanies = safeNumber(companiesRes[0]?.count);
 
   // Note: avgOpportunityScore is obsolete numeric Phase 7 construct. Replaced with Favorable Count.
   
@@ -161,7 +173,7 @@ export default async function DashboardPage() {
         eq(schema.applicationResults.readinessLevel, 'Ready Now')
       ))
     : [{ count: 0 }];
-  const readyNowCount = Number(readyNowRes[0]?.count ?? 0);
+  const readyNowCount = safeNumber(readyNowRes[0]?.count);
 
   const needsWorkRes = latestRun
     ? await db.select({ count: sql<number>`count(*)` })
@@ -171,7 +183,7 @@ export default async function DashboardPage() {
         eq(schema.applicationResults.readinessLevel, 'Needs Improvement')
       ))
     : [{ count: 0 }];
-  const needsWorkCount = Number(needsWorkRes[0]?.count ?? 0);
+  const needsWorkCount = safeNumber(needsWorkRes[0]?.count);
 
   // avgReadiness: run-scoped (not global)
   const avgReadinessRes = latestRun
@@ -179,7 +191,7 @@ export default async function DashboardPage() {
         .from(schema.applicationResults)
         .where(eq(schema.applicationResults.runId, latestRun.id))
     : [{ avg: 0 }];
-  const avgReadiness = Math.round(Number(avgReadinessRes[0]?.avg ?? 0));
+  const avgReadiness = safeRound(avgReadinessRes[0]?.avg);
 
   // ── Latest run (hunt status panel) ─────────────────────────────────────────
   const latestRunRes = await db.select()
@@ -285,14 +297,9 @@ export default async function DashboardPage() {
     });
   }
 
-  // ── Age helper for job cards ────────────────────────────────────────────────
+  // ── Age helper for job cards (delegates to NaN-safe centralized utility) ────
   function jobAge(firstSeenAt: string): string {
-    const days = Math.floor((Date.now() - new Date(firstSeenAt).getTime()) / 86_400_000);
-    if (days < 1) return 'Today';
-    if (days === 1) return '1d ago';
-    if (days < 7) return `${days}d ago`;
-    if (days < 30) return `${Math.floor(days / 7)}w ago`;
-    return `${Math.floor(days / 30)}mo ago`;
+    return safeJobAge(firstSeenAt) || 'New';
   }
 
   // ── Data availability flags ─────────────────────────────────────────────────

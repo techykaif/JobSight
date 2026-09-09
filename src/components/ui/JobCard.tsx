@@ -102,7 +102,8 @@ const companyHue = (name: string): number => {
 };
 
 const ScoreGauge: React.FC<{ score: number }> = ({ score }) => {
-  const clamped = Math.max(0, Math.min(100, score));
+  const safeScore = Number.isFinite(score) ? score : 0;
+  const clamped = Math.max(0, Math.min(100, safeScore));
   const radius = 16;
   const circumference = 2 * Math.PI * radius;
   const dash = (clamped / 100) * circumference;

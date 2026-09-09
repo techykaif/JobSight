@@ -6,6 +6,7 @@ import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { JobCard } from '@/components/ui/JobCard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { getActiveRun } from '@/lib/pipeline/active-run';
+import { safeJobAge } from '@/lib/utils/safe-number';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -468,12 +469,7 @@ export default async function JobsPage({
     });
 
     function jobAge(firstSeenAt: string): string {
-      const days = Math.floor((Date.now() - new Date(firstSeenAt).getTime()) / 86_400_000);
-      if (days < 1) return 'Today';
-      if (days === 1) return '1d ago';
-      if (days < 7) return `${days}d ago`;
-      if (days < 30) return `${Math.floor(days / 7)}w ago`;
-      return `${Math.floor(days / 30)}mo ago`;
+      return safeJobAge(firstSeenAt) || 'New';
     }
 
     return (

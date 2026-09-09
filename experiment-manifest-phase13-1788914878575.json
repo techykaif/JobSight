@@ -1,0 +1,24 @@
+{
+  "experimentId": "phase13-1788914878575",
+  "requestedRuns": 2,
+  "launchedRuns": 2,
+  "runs": [
+    {
+      "runId": "c2f2cebf-2dc8-4411-9db2-694783d8dbdc",
+      "hunt": "HUNT 01 - FRESHER SOFTWARE ENGINEER",
+      "status": "COMPLETED"
+    },
+    {
+      "runId": "68e5ec18-bc65-4399-8ea8-bcaa05373e5a",
+      "hunt": "HUNT 02 - REMOTE FULLSTACK",
+      "status": "COMPLETED_WITH_FAILURES"
+    }
+  ],
+  "summary": {
+    "terminal": 2,
+    "running": 0,
+    "failed": 0,
+    "completed": 1,
+    "completedWithFailures": 1
+  }
+}

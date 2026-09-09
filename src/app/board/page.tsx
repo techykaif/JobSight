@@ -1,6 +1,8 @@
 import { db } from '@/lib/db/client';
 import * as schema from '@/lib/db/schema';
 import { getActiveRun } from '@/lib/pipeline/active-run';
+import { toUICategory } from '@/lib/candidate-decision/mapping';
+import { safeJobAge } from '@/lib/utils/safe-number';
 import { eq, desc, inArray, and } from 'drizzle-orm';
 import Link from 'next/link';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
@@ -93,13 +95,19 @@ export default async function DecisionBoardPage() {
   const decisionConfidenceByJobId = latestByKey(decisionResultRows, r => r.jobId);
   const companyOpportunityByCompanyId = latestByKey(companyOpportunityRows, r => r.companyId);
 
+  // Bucket jobs using the AUTHORITATIVE mapping (shared with Dashboard counts).
+  // toUICategory handles null/undefined finalDecision → 'Monitor'.
   const buckets: Record<string, typeof uniqueJobs> = {
-    'Apply Now': uniqueJobs.filter(j => (j.finalDecision || 'PENDING') === 'APPLY'),
-    'Apply This Week': uniqueJobs.filter(j => (j.finalDecision || 'PENDING') === 'REVIEW'),
-    'Monitor': uniqueJobs.filter(j => (j.finalDecision || 'PENDING') === 'PENDING'),
-    'Research': uniqueJobs.filter(j => (j.finalDecision || 'PENDING') === 'INSUFFICIENT_EVIDENCE'),
-    'Rejected': uniqueJobs.filter(j => (j.finalDecision || 'PENDING') === 'SKIP' || (j.finalDecision || 'PENDING') === 'INELIGIBLE'),
+    'Apply Now': [],
+    'Apply This Week': [],
+    'Monitor': [],
+    'Research': [],
+    'Rejected': [],
   };
+  for (const j of uniqueJobs) {
+    const category = toUICategory(j.finalDecision);
+    (buckets[category] ??= []).push(j);
+  }
 
   const totalActive = (buckets['Apply Now']?.length ?? 0) + (buckets['Apply This Week']?.length ?? 0) + (buckets['Monitor']?.length ?? 0);
 
@@ -155,7 +163,7 @@ export default async function DecisionBoardPage() {
                         readiness={applicationResult?.readinessLevel}
                         companyOpportunity={companyOpportunityResult?.level}
                         confidence={decisionResult?.confidence ?? undefined}
-                        age={job.firstSeenAt ? `${getAgeInDays(job.firstSeenAt)}d ago` : undefined}
+                        age={safeJobAge(job.firstSeenAt) || undefined}
                         decision={job.decision ?? undefined}
                         hideDecisionBadge
                         className="board-card"

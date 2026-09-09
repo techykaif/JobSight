@@ -1,0 +1,64 @@
+{
+  "experimentId": "phase13-1788908062929",
+  "requestedRuns": 10,
+  "launchedRuns": 10,
+  "runs": [
+    {
+      "runId": "f71b0961-2dfc-41c8-a45b-2a5ac92f0b00",
+      "hunt": "HUNT 01 - FRESHER SOFTWARE ENGINEER",
+      "status": "COMPLETED_WITH_FAILURES"
+    },
+    {
+      "runId": "f1dc973c-cbf6-4a45-a7a0-75080b0c83ef",
+      "hunt": "HUNT 02 - REMOTE FULLSTACK",
+      "status": "COMPLETED_WITH_FAILURES"
+    },
+    {
+      "runId": "1e3a538b-e6f4-43a2-bea2-64faece54b90",
+      "hunt": "HUNT 03 - REMOTE FRONTEND",
+      "status": "COMPLETED_WITH_FAILURES"
+    },
+    {
+      "runId": "09464cad-e22e-45bf-834b-edd98f4c45fe",
+      "hunt": "HUNT 04 - REMOTE BACKEND",
+      "status": "COMPLETED_WITH_FAILURES"
+    },
+    {
+      "runId": "8aa845ed-1214-4d00-9b91-02b06847e064",
+      "hunt": "HUNT 05 - STARTUP ENGINEERING",
+      "status": "COMPLETED_WITH_FAILURES"
+    },
+    {
+      "runId": "1ce531f5-a2d0-45dd-9467-917dc5ed49ed",
+      "hunt": "HUNT 06 - SMALL / MID-SIZE EMPLOYER",
+      "status": "COMPLETED"
+    },
+    {
+      "runId": "1d682e54-16f7-403a-909e-95c564cb05b4",
+      "hunt": "HUNT 07 - ATS DIVERSITY",
+      "status": "RUNNING"
+    },
+    {
+      "runId": "1a2916fb-2a0e-4d93-9bf5-f272821993ba",
+      "hunt": "HUNT 08 - EARLY-STAGE COMPANY",
+      "status": "RUNNING"
+    },
+    {
+      "runId": "bd62576c-7452-4ee4-8f1a-7b4d3471eba2",
+      "hunt": "HUNT 09 - REMOTE WEB ENGINEERING",
+      "status": "CREATED"
+    },
+    {
+      "runId": "ed09aa74-490d-478c-96f5-4175552646bf",
+      "hunt": "HUNT 10 - BROAD SOFTWARE ENGINEERING",
+      "status": "CREATED"
+    }
+  ],
+  "summary": {
+    "terminal": 6,
+    "running": 4,
+    "failed": 0,
+    "completed": 1,
+    "completedWithFailures": 5
+  }
+}
