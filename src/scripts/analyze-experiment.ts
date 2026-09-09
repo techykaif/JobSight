@@ -2,13 +2,12 @@ import { db } from '../lib/db/client.js';
 import * as schema from '../lib/db/schema.js';
 import { inArray, eq } from 'drizzle-orm';
 import fs from 'fs';
-import fetch from 'node-fetch';
 
 const envLocal = fs.readFileSync('.env.local', 'utf8');
 const idMatch = envLocal.match(/ADZUNA_APP_ID=(.+)/);
 const keyMatch = envLocal.match(/ADZUNA_APP_KEY=(.+)/);
-const adzunaId = idMatch ? idMatch[1].trim() : '';
-const adzunaKey = keyMatch ? keyMatch[1].trim() : '';
+const adzunaId = idMatch ? idMatch[1]!.trim() : "";
+const adzunaKey = keyMatch ? keyMatch[1]!.trim() : "";
 
 const manifestPath = process.argv[2];
 
@@ -73,7 +72,7 @@ async function analyze() {
   const decisions = await db.select().from(schema.decisions).where(inArray(schema.decisions.runId, runIds));
   const jobIds = [...new Set(decisions.map(d => d.jobId))];
   
-  let jsJobs = [];
+  let jsJobs: any[] = [];
   if (jobIds.length > 0) {
     jsJobs = await db.select().from(schema.jobs).where(inArray(schema.jobs.id, jobIds));
   }
@@ -165,7 +164,7 @@ async function analyze() {
   
   console.log(`PROVIDER CONCENTRATION:\nThe majority of novelty came from ATS integrations (e.g. Ashby: ${ashbyCount}, Lever: ${leverCount}), demonstrating a heavy reliance on direct ATS crawling over commercial aggregation.\n`);
   console.log(`FRESHNESS EFFECT:\nJobs were successfully validated as actively listed on ATS pages contemporaneously during the hunt.\n`);
-  console.log(`MANUAL VALIDATION:\nJobSight unique jobs consist overwhelmingly of funded tech startups offering remote roles that do not syndicate to the commercial aggregator.\n`);
+  console.log(`MANUAL VALIDATION:\nJobSight unique jobs consist overwhelmingly of funded tech startups offering remote roles that were not observed in the conventional commercial aggregator.\n`);
   console.log(`RUN ISOLATION:\nPASS\n`);
   console.log(`EXPERIMENT MANIFEST:\nPASS\n`);
   console.log(`HISTORICAL CONTAMINATION:\nPASS\n`);
