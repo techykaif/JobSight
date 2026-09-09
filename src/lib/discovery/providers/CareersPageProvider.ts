@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "../../utils/network.js";
 import { BaseProvider } from './BaseProvider.js';
 import type { ProviderCapabilities, DiscoveryContext, DiscoveryResult } from '../interfaces.js';
 
@@ -32,7 +33,7 @@ export class CareersPageProvider extends BaseProvider {
   async discover(context: DiscoveryContext): Promise<DiscoveryResult> {
     const start = Date.now();
     try {
-      const response = await fetch(context.sourceUrl);
+      const response = await fetchWithTimeout(context.sourceUrl);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const text = await response.text();
 

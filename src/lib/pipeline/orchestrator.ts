@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "../utils/network.js";
 import { evaluateGeographicEligibility } from '../geographic-eligibility/evaluator.js';
 import { enrichJobFromHtml } from './html-enrichment.js';
 import { db } from '../db/client';
@@ -193,7 +194,7 @@ export async function runMission(runId: string, abortSignal: AbortSignal, isPaus
               try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
-                const res = await fetch(source.sourceUrl, { signal: controller.signal });
+                const res = await fetchWithTimeout(source.sourceUrl, { signal: controller.signal });
                 clearTimeout(timeoutId);
 
                 source.httpStatus = res.status;

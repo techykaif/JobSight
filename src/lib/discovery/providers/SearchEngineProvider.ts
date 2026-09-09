@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "../../utils/network.js";
 import { BaseProvider } from './BaseProvider.js';
 import type { ProviderCapabilities, DiscoveryContext, DiscoveryResult } from '../interfaces.js';
 import { runAgyUnstructured } from '../../agy/runner.js';
@@ -61,7 +62,7 @@ No Markdown, no conversational text, no explanations, no recruiter summaries. Ju
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000);
             // using GET but we don't consume the body.
-            const res = await fetch(url, { redirect: 'follow', signal: controller.signal });
+            const res = await fetchWithTimeout(url, { redirect: 'follow', signal: controller.signal });
             clearTimeout(timeoutId);
             return { original: url, resolved: res.url };
           } catch (e) {

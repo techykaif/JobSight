@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "../../utils/network.js";
 import { BaseProvider } from './BaseProvider.js';
 import type { ProviderCapabilities, DiscoveryContext, DiscoveryResult } from '../interfaces.js';
 
@@ -33,7 +34,7 @@ export class GreenhouseProvider extends BaseProvider {
       // For this implementation, if we don't have direct API access, we can fetch the HTML or rely on a generic fetch.
       // We return mock unstructured text for now to let Stage B do the heavy lifting, or we could parse JSON directly if we implemented the API call.
       
-      const response = await fetch(context.sourceUrl);
+      const response = await fetchWithTimeout(context.sourceUrl);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const text = await response.text();
 
