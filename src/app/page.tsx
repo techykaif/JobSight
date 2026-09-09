@@ -98,8 +98,16 @@ export default async function DashboardPage() {
   const latestSkipCount = Number(decisionsRes.find(d => d.decision === 'SKIP')?.count ?? 0);
   const qualifiedJobs = latestTotalJobs - latestSkipCount;
 
-  const watchlistsRes  = await db.select({ count: sql<number>`count(*)` }).from(schema.watchlists);
-  const monitorCount   = Number(watchlistsRes[0]?.count ?? 0);
+  // Monitor = jobs with finalDecision PENDING in the active run (matches Decision Board 'Monitor' bucket exactly)
+  const monitorRes = latestRun
+    ? await db.select({ count: sql<number>`count(*)` })
+        .from(schema.candidateDecisions)
+        .where(and(
+          eq(schema.candidateDecisions.runId, latestRun.id),
+          eq(schema.candidateDecisions.finalDecision, 'PENDING')
+        ))
+    : [{ count: 0 }];
+  const monitorCount = Number(monitorRes[0]?.count ?? 0);
 
   // ── Discovery intelligence ──────────────────────────────────────────────────
   const favorableOqRes = latestRun
@@ -123,7 +131,17 @@ export default async function DashboardPage() {
   const lowestCompetition = Number(lowCompRes[0]?.count ?? 0);
 
   // ── Portfolio ───────────────────────────────────────────────────────────────
-  const maxSalaryRes = await db.select({ maxSal: sql<number>`max(${schema.jobs.salaryMax})` }).from(schema.jobs);
+  // Highest salary: scoped to jobs observed in the active run, salaryMax must be present (non-null, > 0)
+  // This ensures the metric and the filtered job-card view share the same data universe.
+  const maxSalaryRes = latestRun
+    ? await db.select({ maxSal: sql<number>`max(${schema.jobs.salaryMax})` })
+        .from(schema.jobs)
+        .innerJoin(schema.jobObservations, and(
+          eq(schema.jobObservations.jobId, schema.jobs.id),
+          eq(schema.jobObservations.runId, latestRun.id)
+        ))
+        .where(sql`${schema.jobs.salaryMax} IS NOT NULL AND ${schema.jobs.salaryMax} > 0`)
+    : [{ maxSal: 0 }];
   const highestSalary = Number(maxSalaryRes[0]?.maxSal ?? 0);
   const highestSalaryFormatted = highestSalary > 0 ? formatSalary(highestSalary) : 'N/A';
 
@@ -155,8 +173,12 @@ export default async function DashboardPage() {
     : [{ count: 0 }];
   const needsWorkCount = Number(needsWorkRes[0]?.count ?? 0);
 
-  const avgReadinessRes = await db.select({ avg: sql<number>`avg(${schema.applicationResults.score})` })
-    .from(schema.applicationResults);
+  // avgReadiness: run-scoped (not global)
+  const avgReadinessRes = latestRun
+    ? await db.select({ avg: sql<number>`avg(${schema.applicationResults.score})` })
+        .from(schema.applicationResults)
+        .where(eq(schema.applicationResults.runId, latestRun.id))
+    : [{ avg: 0 }];
   const avgReadiness = Math.round(Number(avgReadinessRes[0]?.avg ?? 0));
 
   // ── Latest run (hunt status panel) ─────────────────────────────────────────
@@ -348,7 +370,7 @@ export default async function DashboardPage() {
             </div>
             <div className="dashboard-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
               <MetricCard
-                href="/board"
+                href="/jobs?filter=apply-now"
                 label="Apply Now"
                 value={applyCount}
                 icon={
@@ -358,7 +380,7 @@ export default async function DashboardPage() {
                 }
               />
               <MetricCard
-                href="/board"
+                href="/jobs?filter=apply-this-week"
                 label="Apply This Week"
                 value={applyThisWeekCount}
                 icon={
@@ -368,7 +390,7 @@ export default async function DashboardPage() {
                 }
               />
               <MetricCard
-                href="/board"
+                href="/jobs?filter=monitor"
                 label="Monitor"
                 value={monitorCount}
                 icon={
@@ -377,10 +399,22 @@ export default async function DashboardPage() {
                   </svg>
                 }
               />
+              {researchCount > 0 && (
+                <MetricCard
+                  href="/jobs?filter=research"
+                  label="Research"
+                  value={researchCount}
+                  icon={
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                    </svg>
+                  }
+                />
+              )}
               {/* Application readiness — only if data exists */}
               {hasApplicationIntelligence && readyNowCount > 0 && (
                 <MetricCard
-                  href="/jobs?readiness=Ready+Now"
+                  href="/jobs?filter=resume-ready"
                   label="Resume Ready"
                   value={readyNowCount}
                   icon={
@@ -392,7 +426,7 @@ export default async function DashboardPage() {
               )}
               {hasApplicationIntelligence && needsWorkCount > 0 && (
                 <MetricCard
-                  href="/jobs?readiness=Needs+Improvement"
+                  href="/jobs?filter=resume-needs-work"
                   label="Resume Needs Work"
                   value={needsWorkCount}
                   icon={
@@ -423,7 +457,7 @@ export default async function DashboardPage() {
             </div>
             <div className="dashboard-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
               <MetricCard
-                href="/jobs"
+                href="/jobs?filter=jobs-found"
                 label="Jobs Found"
                 value={totalJobs}
                 icon={
@@ -433,7 +467,7 @@ export default async function DashboardPage() {
                 }
               />
               <MetricCard
-                href="/jobs"
+                href="/jobs?filter=qualified"
                 label="Qualified Jobs"
                 value={qualifiedJobs}
                 icon={
@@ -443,7 +477,7 @@ export default async function DashboardPage() {
                 }
               />
               <MetricCard
-                href="/radar"
+                href="/jobs?filter=favorable"
                 label="Favorable Opportunities"
                 value={favorableCount}
                 icon={
@@ -453,7 +487,7 @@ export default async function DashboardPage() {
                 }
               />
               <MetricCard
-                href="/radar"
+                href="/jobs?filter=low-competition"
                 label="Low Competition"
                 value={lowestCompetition}
                 icon={
@@ -557,18 +591,30 @@ export default async function DashboardPage() {
               <div style={{ flex: 1, height: 1, background: 'var(--border-hairline)' }} />
             </div>
             <div className="dashboard-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
+              {highestSalary > 0 ? (
+                <MetricCard
+                  href="/jobs?filter=highest-salary"
+                  label="Highest Salary"
+                  value={highestSalaryFormatted}
+                  icon={
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--success-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
+                    </svg>
+                  }
+                />
+              ) : (
+                <MetricCard
+                  label="Highest Salary"
+                  value="N/A"
+                  icon={
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--success-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
+                    </svg>
+                  }
+                />
+              )}
               <MetricCard
-                href="/jobs?sort=salary_desc"
-                label="Highest Salary"
-                value={highestSalaryFormatted}
-                icon={
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--success-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
-                  </svg>
-                }
-              />
-              <MetricCard
-                href="/radar"
+                href="/jobs?filter=favorable"
                 label="Favorable Opportunities"
                 value={favorableCount}
                 icon={
@@ -578,7 +624,7 @@ export default async function DashboardPage() {
                 }
               />
               <MetricCard
-                href="/radar"
+                href="/jobs?filter=low-competition"
                 label="Low Competition"
                 value={lowestCompetition}
                 icon={
